@@ -12,6 +12,13 @@ const badgeVariants = cva(
         secondary: "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
         destructive: "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
         outline: "text-foreground",
+        gold: "border-transparent bg-accent text-accent-foreground font-bold",
+        success: "border-transparent bg-success text-success-foreground",
+        warning: "border-transparent bg-warning text-warning-foreground",
+        maha: "border-transparent bg-primary text-primary-foreground",
+        thera: "border-transparent bg-maroon-light text-cream",
+        majjhima: "border-transparent bg-gold-dark text-cream",
+        navaka: "border-transparent bg-muted text-foreground",
       },
     },
     defaultVariants: {
