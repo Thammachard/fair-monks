@@ -82,7 +82,7 @@ export default function QueuePage() {
               <div
                 key={m.id}
                 className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm animate-slide-in ${
-                  m.isFrozen ? 'bg-blue-50 border-blue-200' : 'bg-background'
+                  m.isFrozen ? 'bg-muted border-ring/30' : 'bg-background'
                 }`}
                 style={{ animationDelay: `${i * 30}ms` }}
               >
