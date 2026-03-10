@@ -95,6 +95,9 @@ export default function AdminPage() {
           <Button variant="outline" size="sm" className="gap-1" onClick={() => navigate('/queue')}>
             <Users className="h-4 w-4" /> ดูคิว
           </Button>
+          <Button variant="outline" size="sm" className="gap-1" onClick={() => navigate('/history')}>
+            <Clock className="h-4 w-4" /> ประวัติงาน
+          </Button>
         </div>
 
         {/* Create Ceremony Form */}
