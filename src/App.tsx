@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import AdminPage from "./pages/AdminPage";
 import BuildingHeadPage from "./pages/BuildingHeadPage";
 import QueuePage from "./pages/QueuePage";
+import HistoryPage from "./pages/HistoryPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -20,6 +21,7 @@ const App = () => (
           <Route path="/" element={<AdminPage />} />
           <Route path="/building-head" element={<BuildingHeadPage />} />
           <Route path="/queue" element={<QueuePage />} />
+          <Route path="/history" element={<HistoryPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
