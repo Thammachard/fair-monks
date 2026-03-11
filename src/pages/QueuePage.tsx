@@ -48,7 +48,7 @@ export default function QueuePage() {
 
       <main className="container mx-auto max-w-4xl px-4 py-6 space-y-4">
         <Button variant="outline" size="sm" className="gap-1" onClick={() => navigate('/')}>
-          <ArrowLeft className="h-4 w-4" /> กลับหน้าแอดมิน
+          <ArrowLeft className="h-4 w-4" /> กลับหน้าหลัก
         </Button>
 
         {/* Stats */}
