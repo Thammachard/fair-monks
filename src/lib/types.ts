@@ -44,26 +44,43 @@ export interface Assignment {
   sermonTopic?: string;  // บทเทศน์ (สำหรับหัวนำสวด)
 }
 
+export type TransportOption = 'เจ้าภาพรับ-ส่ง' | 'วัดเดินทางเอง';
+export type MealOption = 'ไม่มี' | 'มื้อเช้า' | 'มื้อเพล';
+export type DiningStyle = 'ฉันวง' | 'ฉันโตก';
+
 export interface CeremonyRequest {
   id: string;
+  // ส่วนที่ 1: ข้อมูลเจ้าภาพ
   requesterName: string;
+  phoneNumber: string;
+  lineId?: string;
+  // ส่วนที่ 2: รายละเอียดกิจนิมนต์
   ceremonyType: CeremonyType;
+  ceremonyTitle?: string;          // ชื่องานพิธี
   date: string;
   time: string;
-  location: string;
-  locationUrl?: string;       // Google Maps URL
   monkCount: number;
-  description: string;
-  additionalDetails?: string;
-  needTemplePreparation: boolean;  // ให้วัดเตรียมสังฆทาน
-  templePreparationDetails?: string;
-  selectedChantIds?: string[];     // บทสวดที่ต้องการ
-  specifiedMonkIds?: string[];     // เจาะจงพระ
+  specifiedMonkNames?: string;     // ระบุชื่อพระที่เจาะจง
+  // ส่วนที่ 3: สถานที่และการเดินทาง
   ceremonyLocation: CeremonyLocation;
+  location: string;
+  locationUrl?: string;
+  transportOption: TransportOption;
+  pickupTime?: string;             // เวลานัดหมายรับพระ
+  // ส่วนที่ 4: การรับรองและภัตตาหาร
+  mealOption: MealOption;
+  diningStyle?: DiningStyle;
+  additionalDetails?: string;
+  // ระบบเดิม
+  description: string;
+  needTemplePreparation: boolean;
+  templePreparationDetails?: string;
+  selectedChantIds?: string[];
+  specifiedMonkIds?: string[];
   status: 'waiting' | 'approved' | 'rejected';
   createdAt: string;
-  suggestedItems?: string;         // สิ่งที่ต้องเตรียม
-  suggestedTime?: string;          // แนะนำเรื่องเวลา
+  suggestedItems?: string;
+  suggestedTime?: string;
 }
 
 export interface Ceremony {
