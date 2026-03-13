@@ -2,13 +2,16 @@ import { LeadChanterCriteria } from './chantingData';
 
 export type MonkRank = 'มหาเถระ' | 'เถระ' | 'มัชฌิมะ' | 'นวกะ';
 
-export type CeremonyType = 'มงคล' | 'อวมงคล';
+export type CeremonyType = 'มงคล' | 'อวมงคล' | 'ใส่บาตรและเจริญพระพุทธมนต์' | 'งานส่วนรวมของวัด';
 
 export type MonkAbility = 'มงคล' | 'อวมงคล' | 'ทั้งสอง';
 
-export type AssignmentStatus = 'draft' | 'pending' | 'approved' | 'rejected_sick' | 'rejected_skip' | 'substituted';
+export type AssignmentStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'substituted';
 
 export type CeremonyLocation = 'ในวัด' | 'นอกวัด';
+
+export type MonkAvailability = 'พร้อมรับงาน' | 'ไม่พร้อมรับงาน';
+export type MonkAcceptMode = 'รับงานทั่วไป' | 'รับเฉพาะงานเจาะจง';
 
 export interface AssignmentHistoryEntry {
   ceremonyId: string;
@@ -16,6 +19,7 @@ export interface AssignmentHistoryEntry {
   date: string;
   status: 'attended' | 'rejected' | 'substituted';
   role?: 'หัวนำสวด' | 'ผู้สวด';
+  rejectReason?: string;
 }
 
 export interface Monk {
@@ -29,10 +33,14 @@ export interface Monk {
   queueScore: number;
   isFrozen: boolean;
   totalAssignments: number;
-  chantIds?: string[];              // บทสวดที่สวดได้
-  activityScore?: number;           // คะแนนกิจ 1-5
-  leadCriteria?: LeadChanterCriteria; // เกณฑ์หัวนำสวด
-  assignmentHistory?: AssignmentHistoryEntry[]; // ประวัติการรับงาน
+  chantIds?: string[];
+  activityScore: number;
+  leadCriteria?: LeadChanterCriteria;
+  assignmentHistory?: AssignmentHistoryEntry[];
+  // New fields for self-service
+  availability: MonkAvailability;
+  unavailableReason?: string;
+  acceptMode: MonkAcceptMode;
 }
 
 export interface QuotaConfig {
@@ -50,37 +58,32 @@ export interface Assignment {
   status: AssignmentStatus;
   rejectReason?: string;
   substitute?: Monk;
-  sermonTopic?: string;  // บทเทศน์ (สำหรับหัวนำสวด)
+  sermonTopic?: string;
 }
 
 export type TransportOption = 'เจ้าภาพรับ-ส่ง' | 'วัดเดินทางเอง';
-export type MealOption = 'ไม่มี' | 'มื้อเช้า' | 'มื้อเพล';
+export type MealOption = 'ไม่มี' | 'ภัตตาหาร';
 export type DiningStyle = 'ฉันวง' | 'ฉันโตก';
 
 export interface CeremonyRequest {
   id: string;
-  // ส่วนที่ 1: ข้อมูลเจ้าภาพ
   requesterName: string;
   phoneNumber: string;
   lineId?: string;
-  // ส่วนที่ 2: รายละเอียดกิจนิมนต์
   ceremonyType: CeremonyType;
-  ceremonyTitle?: string;          // ชื่องานพิธี
+  ceremonyTitle?: string;
   date: string;
   time: string;
   monkCount: number;
-  specifiedMonkNames?: string;     // ระบุชื่อพระที่เจาะจง
-  // ส่วนที่ 3: สถานที่และการเดินทาง
+  specifiedMonkNames?: string;
   ceremonyLocation: CeremonyLocation;
   location: string;
   locationUrl?: string;
   transportOption: TransportOption;
-  pickupTime?: string;             // เวลานัดหมายรับพระ
-  // ส่วนที่ 4: การรับรองและภัตตาหาร
+  pickupTime?: string;
   mealOption: MealOption;
   diningStyle?: DiningStyle;
   additionalDetails?: string;
-  // ระบบเดิม
   description: string;
   needTemplePreparation: boolean;
   templePreparationDetails?: string;
@@ -116,9 +119,11 @@ export interface Ceremony {
   suggestedTime?: string;
   needTemplePreparation?: boolean;
   templePreparationDetails?: string;
+  templePreparationItems?: string[];
   requestId?: string;
-  isOpenForAll?: boolean;           // งานส่วนรวม
-  checkInResults?: CheckInEntry[];  // ผลเช็กชื่องานส่วนรวม
+  isOpenForAll?: boolean;
+  checkInResults?: CheckInEntry[];
+  phoneNumber?: string;
 }
 
 // Quota configs for different ceremony sizes
@@ -140,7 +145,6 @@ export const RANK_COLORS: Record<MonkRank, string> = {
   'นวกะ': 'bg-muted text-foreground',
 };
 
-// Rejection reasons dropdown
 export const REJECTION_REASONS = [
   'อาพาธ',
   'ติดสอบบาลี',
