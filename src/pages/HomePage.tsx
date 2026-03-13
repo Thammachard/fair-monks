@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Ceremony, Monk } from '@/lib/types';
 import { loadCeremonies, loadMonks } from '@/lib/storage';
 import { Badge } from '@/components/ui/badge';
@@ -10,10 +10,11 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
+import { Progress } from '@/components/ui/progress';
 import { useNavigate } from 'react-router-dom';
 import {
   CalendarIcon, MapPin, Phone, Users, Clock, ChevronRight, Info, Settings,
-  BookOpen, UserCheck, BarChart3, FileText, Heart, Shield, Star
+  BookOpen, UserCheck, BarChart3, FileText, Heart, Shield, Star, ChevronDown
 } from 'lucide-react';
 import { format, isSameDay, parseISO, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { th } from 'date-fns/locale';
@@ -23,9 +24,9 @@ const CONTACT_INFO = {
   name: 'พระมหาสมชาย (เจ้าหน้าที่กิจนิมนต์)',
   phone: '081-234-5678',
   line: '@temple-nimmon',
+  address: 'วัดตัวอย่าง ต.ตัวอย่าง อ.เมือง จ.ตัวอย่าง 10000',
 };
 
-// Mock special dates for the temple calendar
 const SPECIAL_DATES = [
   { date: '2026-03-15', label: 'วันมาฆบูชา', type: 'buddhist' as const },
   { date: '2026-03-22', label: 'วันพระ', type: 'wan-phra' as const },
@@ -42,6 +43,9 @@ export default function HomePage() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedMonkId, setSelectedMonkId] = useState<string>('');
   const [showDashboard, setShowDashboard] = useState(false);
+
+  const laypeopleRef = useRef<HTMLElement>(null);
+  const monkRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     setCeremonies(loadCeremonies());
@@ -92,28 +96,64 @@ export default function HomePage() {
     return { bg: 'bg-success/10', text: 'text-success', dot: '🟢' };
   };
 
+  const scrollTo = (ref: React.RefObject<HTMLElement | null>) => {
+    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Hero Header */}
-      <header className="gradient-maroon px-4 py-8 shadow-lg">
-        <div className="container mx-auto max-w-4xl text-center">
-          <div className="flex justify-center mb-3">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-secondary shadow-gold">
-              <span className="text-3xl">🛕</span>
+
+      {/* ═══════════════════════════════════════════════════════════ */}
+      {/* SECTION 1: HERO                                           */}
+      {/* ═══════════════════════════════════════════════════════════ */}
+      <header className="relative overflow-hidden">
+        {/* Gradient background */}
+        <div className="absolute inset-0 gradient-maroon" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,hsl(43_74%_49%/0.15),transparent_60%)]" />
+        <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-background to-transparent" />
+
+        <div className="relative z-10 container mx-auto max-w-4xl px-4 pt-10 pb-16 text-center">
+          {/* Temple icon */}
+          <div className="flex justify-center mb-4">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-secondary/90 shadow-gold ring-4 ring-secondary/30">
+              <span className="text-4xl">🛕</span>
             </div>
           </div>
-          <h1 className="text-2xl font-bold text-primary-foreground tracking-tight">
-            ระบบนิมนต์พระ-สามเณร ประจำวัด
+
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-primary-foreground tracking-tight leading-snug">
+            ระบบบริหารกิจนิมนต์<br className="sm:hidden" />และตารางงานวัด
           </h1>
-          <p className="text-sm text-primary-foreground/70 mt-1">
-            Temple Monk Invitation Portal
+          <p className="text-sm text-primary-foreground/60 mt-2 max-w-md mx-auto">
+            Temple Monk Invitation &amp; Scheduling Portal
           </p>
+
+          {/* Dual CTA */}
+          <div className="flex flex-col sm:flex-row gap-3 justify-center mt-8">
+            <Button
+              variant="gold"
+              size="lg"
+              className="gap-2 text-base px-8 shadow-lg"
+              onClick={() => scrollTo(laypeopleRef)}
+            >
+              🙏 ขอนิมนต์พระ
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              className="gap-2 text-base px-8 bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 hover:text-primary-foreground"
+              onClick={() => scrollTo(monkRef)}
+            >
+              🪷 เข้าสู่ระบบพระภิกษุ
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </header>
 
-      {/* Quick Nav */}
+      {/* Quick Nav strip */}
       <div className="container mx-auto max-w-4xl px-4 -mt-4 relative z-10">
-        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+        <div className="flex gap-2 overflow-x-auto pb-2">
           <Button variant="gold" size="sm" className="gap-1 shrink-0">
             <CalendarIcon className="h-4 w-4" /> หน้าหลัก
           </Button>
@@ -129,163 +169,229 @@ export default function HomePage() {
         </div>
       </div>
 
-      <main className="container mx-auto max-w-4xl px-4 py-6 space-y-8">
+      <main className="container mx-auto max-w-4xl px-4 py-6 space-y-10">
 
-        {/* ═══════════════════════════════════════════════════ */}
-        {/* SECTION 1: สำหรับญาติโยม (Laypeople Section)      */}
-        {/* ═══════════════════════════════════════════════════ */}
+        {/* ═══════════════════════════════════════════════════════════ */}
+        {/* SECTION 2: PUBLIC CALENDAR                                */}
+        {/* ═══════════════════════════════════════════════════════════ */}
         <section>
-          <div className="flex items-center gap-2 mb-4">
-            <Heart className="h-5 w-5 text-secondary" />
-            <h2 className="text-lg font-bold text-foreground">สำหรับญาติโยม</h2>
+          <div className="flex items-center gap-2 mb-1">
+            <Star className="h-5 w-5 text-secondary" />
+            <h2 className="text-lg font-bold text-foreground">ตรวจสอบตารางกิจกรรมวัด</h2>
           </div>
+          <p className="text-sm text-muted-foreground mb-4">
+            กรุณาตรวจสอบตารางงานส่วนกลางของวัดก่อนทำการขอนิมนต์
+          </p>
 
-          {/* CTA Card */}
-          <Card className="shadow-card border-gold-subtle overflow-hidden">
-            <div className="gradient-gold p-6 text-center">
-              <span className="text-4xl mb-3 block">🙏</span>
-              <h3 className="text-xl font-bold text-secondary-foreground mb-1">
-                ต้องการนิมนต์พระ?
-              </h3>
-              <p className="text-sm text-secondary-foreground/80 mb-4">
-                กรอกแบบฟอร์มนิมนต์พระ เพื่อจองคิวงานบุญของท่าน
-              </p>
-              <Button
-                variant="maroon"
-                size="lg"
-                className="gap-2 text-base px-8 shadow-lg"
-                onClick={() => navigate('/request')}
-              >
-                <FileText className="h-5 w-5" />
-                กรอกแบบฟอร์มนิมนต์พระ
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </Card>
-
-          {/* Guide Accordion */}
-          <Card className="shadow-card mt-4">
+          <Card className="shadow-card border-gold-subtle">
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-secondary" />
-                ข้อควรรู้ / คู่มือการจัดเตรียม
+                <CalendarIcon className="h-5 w-5 text-secondary" />
+                ปฏิทินงานบุญ — {format(selectedDate, 'MMMM yyyy', { locale: th })}
               </CardTitle>
+              <div className="flex flex-wrap gap-3 text-xs mt-2">
+                <span className="flex items-center gap-1">🟢 มงคลนอกวัด</span>
+                <span className="flex items-center gap-1">🟡 งานในวัด</span>
+                <span className="flex items-center gap-1">⬜ อวมงคล</span>
+                <span className="flex items-center gap-1">🔴 วันพระ/วันสำคัญ</span>
+              </div>
             </CardHeader>
             <CardContent>
-              <Accordion type="single" collapsible className="w-full">
-                <AccordionItem value="mangkol">
-                  <AccordionTrigger className="text-sm">
-                    🟢 งานมงคล — ต้องเตรียมอะไรบ้าง?
-                  </AccordionTrigger>
-                  <AccordionContent className="text-sm text-muted-foreground space-y-2">
-                    <p><strong>ประเภทงาน:</strong> ทำบุญบ้าน, ขึ้นบ้านใหม่, มงคลสมรส, งานบวช</p>
-                    <p><strong>สิ่งที่ต้องเตรียม:</strong></p>
-                    <ul className="list-disc pl-5 space-y-1">
-                      <li>โต๊ะหมู่บูชา พร้อมพระพุทธรูป</li>
-                      <li>ดอกไม้ ธูป เทียน</li>
-                      <li>น้ำมนต์ (ขันสาคร)</li>
-                      <li>สายสิญจน์</li>
-                      <li>ภัตตาหาร / สังฆทาน</li>
-                    </ul>
-                    <p className="text-secondary text-xs mt-2">
-                      💡 หากไม่มี สามารถให้ทางวัดจัดเตรียมให้ได้ (มีค่าใช้จ่ายเพิ่มเติม)
-                    </p>
-                  </AccordionContent>
-                </AccordionItem>
-                <AccordionItem value="avamangkol">
-                  <AccordionTrigger className="text-sm">
-                    ⬜ งานอวมงคล — ต้องเตรียมอะไรบ้าง?
-                  </AccordionTrigger>
-                  <AccordionContent className="text-sm text-muted-foreground space-y-2">
-                    <p><strong>ประเภทงาน:</strong> งานศพ, งานทำบุญ 7 วัน / 50 วัน / 100 วัน</p>
-                    <p><strong>สิ่งที่ต้องเตรียม:</strong></p>
-                    <ul className="list-disc pl-5 space-y-1">
-                      <li>โต๊ะหมู่บูชา พร้อมรูปผู้ล่วงลับ</li>
-                      <li>ดอกไม้จันทน์ ธูป เทียน</li>
-                      <li>สังฆทาน / ชุดไทยธรรม</li>
-                      <li>ภัตตาหาร</li>
-                    </ul>
-                    <p className="text-secondary text-xs mt-2">
-                      💡 ทางวัดมีบริการจัดเตรียมชุดไทยธรรม กรุณาแจ้งในแบบฟอร์ม
-                    </p>
-                  </AccordionContent>
-                </AccordionItem>
-                <AccordionItem value="inwat">
-                  <AccordionTrigger className="text-sm">
-                    🟡 งานในวัด — กำหนดการ
-                  </AccordionTrigger>
-                  <AccordionContent className="text-sm text-muted-foreground space-y-2">
-                    <p>ทำบุญประจำวัน, งานพิธีในพระอุโบสถ, งานบุญเทศกาล</p>
-                    <p><strong>เวลาที่แนะนำ:</strong> 07:00 - 09:00 น. หรือ 10:00 - 11:00 น.</p>
-                    <p>ทางวัดจัดเตรียมสถานที่ให้เรียบร้อย เจ้าภาพเตรียมเฉพาะสิ่งของถวาย</p>
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={(d) => d && setSelectedDate(d)}
+                className={cn("p-3 pointer-events-auto mx-auto")}
+                modifiers={{ ceremony: ceremonyDates }}
+                modifiersStyles={{
+                  ceremony: {
+                    fontWeight: 'bold',
+                    textDecoration: 'underline',
+                    textDecorationColor: 'hsl(43, 74%, 49%)',
+                  },
+                }}
+              />
+
+              {/* Events on selected date */}
+              <div className="mt-4 space-y-2">
+                <p className="text-sm font-semibold">
+                  📅 {format(selectedDate, 'PPP', { locale: th })}
+                </p>
+
+                {SPECIAL_DATES.filter(s => {
+                  try { return isSameDay(parseISO(s.date), selectedDate); } catch { return false; }
+                }).map((s, i) => (
+                  <div key={i} className="rounded-lg p-3 bg-destructive/10 border border-destructive/20">
+                    <p className="text-sm font-semibold text-destructive">🔴 {s.label}</p>
+                  </div>
+                ))}
+
+                {ceremoniesOnDate.length === 0 && (
+                  <p className="text-sm text-muted-foreground">ไม่มีงานนิมนต์ในวันนี้</p>
+                )}
+
+                {ceremoniesOnDate.map(c => {
+                  const style = getTypeStyle(c.type, c.ceremonyLocation);
+                  return (
+                    <div key={c.id} className={`rounded-lg p-3 ${style.bg} border`}>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className={`font-semibold text-sm ${style.text}`}>
+                            {style.dot} {c.type} — {c.monkCount} รูป
+                            {c.ceremonyLocation && ` (${c.ceremonyLocation})`}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {c.time || '-'} · {c.requesterName} · {c.description}
+                          </p>
+                          {c.location && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                              <MapPin className="h-3 w-3" /> {c.location}
+                            </p>
+                          )}
+                        </div>
+                        <Badge variant={c.status === 'confirmed' ? 'success' : 'warning'}>
+                          {c.status === 'confirmed' ? 'ยืนยัน' : 'รอ'}
+                        </Badge>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {specialDatesThisMonth.length > 0 && (
+                <div className="mt-4 pt-3 border-t">
+                  <p className="text-xs font-semibold mb-2">📌 วันสำคัญในเดือนนี้:</p>
+                  <div className="space-y-1">
+                    {specialDatesThisMonth.map((s, i) => (
+                      <p key={i} className="text-xs text-muted-foreground">
+                        • {(() => { try { return format(parseISO(s.date), 'd MMM', { locale: th }); } catch { return s.date; } })()} — {s.label}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
-          {/* Contact Info */}
-          <Card className="shadow-card mt-4 border-gold-subtle">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Phone className="h-5 w-5 text-secondary" />
-                ช่องทางติดต่อวัด
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary/20">
-                  <UserCheck className="h-5 w-5 text-secondary" />
-                </div>
-                <div>
-                  <p className="font-semibold text-sm">{CONTACT_INFO.name}</p>
-                  <a href={`tel:${CONTACT_INFO.phone}`} className="text-sm text-secondary flex items-center gap-1">
-                    <Phone className="h-3 w-3" /> {CONTACT_INFO.phone}
-                  </a>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success/20">
-                  <span className="text-lg">💬</span>
-                </div>
-                <div>
-                  <p className="font-semibold text-sm">LINE Official</p>
-                  <p className="text-sm text-muted-foreground">เพิ่มเพื่อน {CONTACT_INFO.line}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                  <MapPin className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="font-semibold text-sm">แผนที่วัด</p>
-                  <a href="https://maps.google.com" target="_blank" rel="noopener noreferrer"
-                    className="text-sm text-secondary underline">
-                    เปิดใน Google Maps
-                  </a>
-                </div>
+          <Card className="bg-secondary/10 border-secondary/30 mt-4">
+            <CardContent className="py-4">
+              <div className="flex items-start gap-3">
+                <Info className="h-5 w-5 text-secondary mt-0.5 shrink-0" />
+                <p className="text-sm">
+                  <strong>หมายเหตุ:</strong> ปฏิทินนี้แสดงงานเบื้องต้น หากต้องการนิมนต์ในวันที่มีงานแล้ว กรุณาสอบถามเจ้าหน้าที่ เพราะทางวัดอาจจัดสรรคณะสงฆ์เพิ่มเติมให้ท่านได้
+                </p>
               </div>
             </CardContent>
           </Card>
         </section>
 
-        <Separator className="my-2" />
+        <Separator />
 
-        {/* ═══════════════════════════════════════════════════ */}
-        {/* SECTION 2: สำหรับพระภิกษุ-สามเณร                   */}
-        {/* ═══════════════════════════════════════════════════ */}
-        <section>
-          <div className="flex items-center gap-2 mb-4">
-            <Shield className="h-5 w-5 text-secondary" />
-            <h2 className="text-lg font-bold text-foreground">สำหรับพระภิกษุ-สามเณร</h2>
+        {/* ═══════════════════════════════════════════════════════════ */}
+        {/* SECTION 3: LAYPEOPLE                                     */}
+        {/* ═══════════════════════════════════════════════════════════ */}
+        <section ref={laypeopleRef}>
+          <div className="flex items-center gap-2 mb-1">
+            <Heart className="h-5 w-5 text-secondary" />
+            <h2 className="text-lg font-bold text-foreground">ขอนิมนต์พระและคู่มือเตรียมงาน</h2>
           </div>
+          <p className="text-sm text-muted-foreground mb-4">
+            กรอกแบบฟอร์มเพื่อขอนิมนต์พระ พร้อมศึกษาคู่มือเตรียมงานบุญ
+          </p>
+
+          {/* Primary CTA */}
+          <Button
+            variant="gold"
+            size="lg"
+            className="w-full gap-2 text-base shadow-gold mb-5"
+            onClick={() => navigate('/request')}
+          >
+            <FileText className="h-5 w-5" />
+            📝 กรอกแบบฟอร์มขอนิมนต์พระ
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+
+          {/* Guide cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Auspicious guide */}
+            <Card className="shadow-card border-success/30 hover:shadow-lg transition-shadow">
+              <CardHeader className="pb-2">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-success/10 mb-2">
+                  <span className="text-2xl">🟢</span>
+                </div>
+                <CardTitle className="text-base">คู่มือเตรียมงานมงคล</CardTitle>
+                <CardDescription className="text-xs">ทำบุญบ้าน, ขึ้นบ้านใหม่, มงคลสมรส, งานบวช</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Accordion type="single" collapsible>
+                  <AccordionItem value="items" className="border-none">
+                    <AccordionTrigger className="text-sm py-2">สิ่งที่ต้องเตรียม</AccordionTrigger>
+                    <AccordionContent className="text-sm text-muted-foreground">
+                      <ul className="list-disc pl-5 space-y-1">
+                        <li>โต๊ะหมู่บูชา พร้อมพระพุทธรูป</li>
+                        <li>ดอกไม้ ธูป เทียน</li>
+                        <li>น้ำมนต์ (ขันสาคร) + สายสิญจน์</li>
+                        <li>ภัตตาหาร / สังฆทาน</li>
+                      </ul>
+                      <p className="text-xs text-secondary mt-2">
+                        💡 วัดมีบริการจัดเตรียมให้ — แจ้งในแบบฟอร์ม
+                      </p>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
+              </CardContent>
+            </Card>
+
+            {/* Inauspicious guide */}
+            <Card className="shadow-card border-muted hover:shadow-lg transition-shadow">
+              <CardHeader className="pb-2">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted mb-2">
+                  <span className="text-2xl">⬜</span>
+                </div>
+                <CardTitle className="text-base">คู่มือเตรียมงานอวมงคล</CardTitle>
+                <CardDescription className="text-xs">งานศพ, ทำบุญ 7/50/100 วัน</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Accordion type="single" collapsible>
+                  <AccordionItem value="items" className="border-none">
+                    <AccordionTrigger className="text-sm py-2">สิ่งที่ต้องเตรียม</AccordionTrigger>
+                    <AccordionContent className="text-sm text-muted-foreground">
+                      <ul className="list-disc pl-5 space-y-1">
+                        <li>โต๊ะหมู่บูชา พร้อมรูปผู้ล่วงลับ</li>
+                        <li>ดอกไม้จันทน์ ธูป เทียน</li>
+                        <li>สังฆทาน / ชุดไทยธรรม</li>
+                        <li>ภัตตาหาร</li>
+                      </ul>
+                      <p className="text-xs text-secondary mt-2">
+                        💡 ทางวัดมีบริการจัดเตรียมชุดไทยธรรม
+                      </p>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+
+        <Separator />
+
+        {/* ═══════════════════════════════════════════════════════════ */}
+        {/* SECTION 4: MONK & NOVICE DASHBOARD                       */}
+        {/* ═══════════════════════════════════════════════════════════ */}
+        <section ref={monkRef}>
+          <div className="flex items-center gap-2 mb-1">
+            <Shield className="h-5 w-5 text-secondary" />
+            <h2 className="text-lg font-bold text-foreground">ระบบเช็คคิวงาน (สำหรับคณะสงฆ์)</h2>
+          </div>
+          <p className="text-sm text-muted-foreground mb-4">
+            เลือกชื่อ/ฉายา เพื่อดูตารางงานกิจนิมนต์และสถิติส่วนตัว
+          </p>
 
           <Card className="shadow-card border-gold-subtle">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 📿 เข้าดูคิวงานและสถิติส่วนตัว
               </CardTitle>
-              <CardDescription>เลือกชื่อ/ฉายาของท่าน เพื่อดูตารางงานกิจนิมนต์</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex gap-2">
@@ -308,7 +414,7 @@ export default function HomePage() {
                   className="gap-1 shrink-0"
                 >
                   <BarChart3 className="h-4 w-4" />
-                  ดูคิวงาน
+                  เข้าสู่ระบบ
                 </Button>
               </div>
 
@@ -352,6 +458,15 @@ export default function HomePage() {
                   </div>
                 </div>
 
+                {/* Progress bar – assignments vs average */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>สถิติการออกงาน</span>
+                    <span>{selectedMonk.totalAssignments} / 20 งาน (เป้าปี)</span>
+                  </div>
+                  <Progress value={Math.min((selectedMonk.totalAssignments / 20) * 100, 100)} className="h-2" />
+                </div>
+
                 {/* Info badges */}
                 <div className="flex flex-wrap gap-2">
                   <Badge variant="outline">ชั้น: {selectedMonk.rank}</Badge>
@@ -367,7 +482,7 @@ export default function HomePage() {
                 {/* Assignments Table */}
                 <div>
                   <h4 className="text-sm font-semibold mb-2 flex items-center gap-1">
-                    <CalendarIcon className="h-4 w-4" /> ตารางงานกิจนิมนต์
+                    <CalendarIcon className="h-4 w-4" /> ตารางงานกิจนิมนต์ที่จะถึง
                   </h4>
                   {monkAssignments.length === 0 ? (
                     <p className="text-sm text-muted-foreground py-4 text-center">ยังไม่มีงานที่ได้รับมอบหมาย</p>
@@ -407,125 +522,61 @@ export default function HomePage() {
           </DialogContent>
         </Dialog>
 
-        <Separator className="my-2" />
+        <Separator />
 
-        {/* ═══════════════════════════════════════════════════ */}
-        {/* SECTION 3: ปฏิทินกิจกรรมวัด (Public Calendar)      */}
-        {/* ═══════════════════════════════════════════════════ */}
-        <section>
-          <div className="flex items-center gap-2 mb-4">
-            <Star className="h-5 w-5 text-secondary" />
-            <h2 className="text-lg font-bold text-foreground">ปฏิทินกิจกรรมวัด</h2>
+        {/* ═══════════════════════════════════════════════════════════ */}
+        {/* SECTION 5: FOOTER                                        */}
+        {/* ═══════════════════════════════════════════════════════════ */}
+        <footer className="rounded-xl bg-card border shadow-card p-6 space-y-4">
+          <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+            <Phone className="h-5 w-5 text-secondary" />
+            ช่องทางติดต่อวัด
+          </h2>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-muted">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary/20 shrink-0">
+                <UserCheck className="h-5 w-5 text-secondary" />
+              </div>
+              <div>
+                <p className="font-semibold text-sm">{CONTACT_INFO.name}</p>
+                <a href={`tel:${CONTACT_INFO.phone}`} className="text-sm text-secondary flex items-center gap-1">
+                  <Phone className="h-3 w-3" /> {CONTACT_INFO.phone}
+                </a>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-muted">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success/20 shrink-0">
+                <span className="text-lg">💬</span>
+              </div>
+              <div>
+                <p className="font-semibold text-sm">LINE Official</p>
+                <p className="text-sm text-muted-foreground">{CONTACT_INFO.line}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-muted">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 shrink-0">
+                <MapPin className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="font-semibold text-sm">แผนที่วัด</p>
+                <a href="https://maps.google.com" target="_blank" rel="noopener noreferrer"
+                  className="text-sm text-secondary underline">
+                  เปิดใน Google Maps
+                </a>
+              </div>
+            </div>
           </div>
 
-          <Card className="shadow-card border-gold-subtle">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <CalendarIcon className="h-5 w-5 text-secondary" />
-                ปฏิทินงานบุญ — {format(selectedDate, 'MMMM yyyy', { locale: th })}
-              </CardTitle>
-              <div className="flex flex-wrap gap-3 text-xs mt-2">
-                <span className="flex items-center gap-1">🟡 งานในวัด</span>
-                <span className="flex items-center gap-1">🟢 งานมงคลนอกวัด</span>
-                <span className="flex items-center gap-1">⬜ งานอวมงคล</span>
-                <span className="flex items-center gap-1">🔴 วันพระ/วันสำคัญ</span>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={(d) => d && setSelectedDate(d)}
-                className={cn("p-3 pointer-events-auto mx-auto")}
-                modifiers={{ ceremony: ceremonyDates }}
-                modifiersStyles={{
-                  ceremony: {
-                    fontWeight: 'bold',
-                    textDecoration: 'underline',
-                    textDecorationColor: 'hsl(43, 74%, 49%)',
-                  },
-                }}
-              />
+          <p className="text-xs text-muted-foreground">{CONTACT_INFO.address}</p>
 
-              {/* Events on selected date */}
-              <div className="mt-4 space-y-2">
-                <p className="text-sm font-semibold">
-                  📅 {format(selectedDate, 'PPP', { locale: th })}
-                </p>
+          <Separator />
 
-                {/* Special dates */}
-                {SPECIAL_DATES.filter(s => {
-                  try { return isSameDay(parseISO(s.date), selectedDate); } catch { return false; }
-                }).map((s, i) => (
-                  <div key={i} className="rounded-lg p-3 bg-destructive/10 border border-destructive/20">
-                    <p className="text-sm font-semibold text-destructive">🔴 {s.label}</p>
-                  </div>
-                ))}
-
-                {ceremoniesOnDate.length === 0 && (
-                  <p className="text-sm text-muted-foreground">ไม่มีงานนิมนต์ในวันนี้</p>
-                )}
-
-                {ceremoniesOnDate.map(c => {
-                  const style = getTypeStyle(c.type, c.ceremonyLocation);
-                  return (
-                    <div key={c.id} className={`rounded-lg p-3 ${style.bg} border`}>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className={`font-semibold text-sm ${style.text}`}>
-                            {style.dot} {c.type} — {c.monkCount} รูป
-                            {c.ceremonyLocation && ` (${c.ceremonyLocation})`}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {c.time || '-'} · {c.requesterName} · {c.description}
-                          </p>
-                          {c.location && (
-                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                              <MapPin className="h-3 w-3" /> {c.location}
-                            </p>
-                          )}
-                        </div>
-                        <Badge variant={c.status === 'confirmed' ? 'success' : 'warning'}>
-                          {c.status === 'confirmed' ? 'ยืนยัน' : 'รอ'}
-                        </Badge>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Special dates list for this month */}
-              {specialDatesThisMonth.length > 0 && (
-                <div className="mt-4 pt-3 border-t">
-                  <p className="text-xs font-semibold mb-2">📌 วันสำคัญในเดือนนี้:</p>
-                  <div className="space-y-1">
-                    {specialDatesThisMonth.map((s, i) => (
-                      <p key={i} className="text-xs text-muted-foreground">
-                        • {(() => { try { return format(parseISO(s.date), 'd MMM', { locale: th }); } catch { return s.date; } })()} — {s.label}
-                      </p>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Notice */}
-          <Card className="bg-secondary/10 border-secondary/30 mt-4">
-            <CardContent className="py-4">
-              <div className="flex items-start gap-3">
-                <Info className="h-5 w-5 text-secondary mt-0.5 shrink-0" />
-                <p className="text-sm">
-                  <strong>หมายเหตุ:</strong> ปฏิทินนี้แสดงงานเบื้องต้น หากต้องการนิมนต์ในวันที่มีงานแล้ว กรุณาสอบถามเจ้าหน้าที่ เพราะทางวัดอาจจัดสรรคณะสงฆ์เพิ่มเติมให้ท่านได้
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </section>
-
-        {/* Footer */}
-        <footer className="text-center py-6 text-xs text-muted-foreground">
-          <p>ระบบบริหารจัดการกิจนิมนต์ © {new Date().getFullYear()}</p>
+          <p className="text-center text-xs text-muted-foreground">
+            ระบบบริหารจัดการกิจนิมนต์ © {new Date().getFullYear()} — พัฒนาเพื่อความโปร่งใสและเป็นธรรม
+          </p>
         </footer>
       </main>
     </div>
