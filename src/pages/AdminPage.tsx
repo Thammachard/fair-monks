@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { CeremonyType, CeremonyLocation, Ceremony, Assignment, QUOTA_CONFIGS, CeremonyRequest, Monk, AssignmentHistoryEntry } from '@/lib/types';
 import { CHANT_CATEGORIES } from '@/lib/chantingData';
-import { generateAssignments } from '@/lib/queueEngine';
+import { generateAssignments, findSubstitute } from '@/lib/queueEngine';
 import { loadMonks, saveMonks, loadCeremonies, saveCeremonies, loadRequests, saveRequests } from '@/lib/storage';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,7 +16,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Users, CalendarIcon, Sparkles, FileText, ChevronRight, Clock, MapPin, Settings, Package, CheckCircle, XCircle, Info, History, UserCheck, UserX, Globe } from 'lucide-react';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Users, CalendarIcon, Sparkles, FileText, ChevronRight, Clock, MapPin, Settings, Package, CheckCircle, XCircle, Info, History, UserCheck, Globe, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -35,21 +36,26 @@ const rankBadgeVariant = (rank: string) => {
   }
 };
 
-const SUGGESTED_ITEMS: Record<CeremonyType, string> = {
-  'มงคล': '- น้ำมนต์ (ขัน/ถัง)\n- ด้ายสายสิญจน์\n- ดอกไม้ ธูป เทียน\n- ภัตตาหาร/ปิ่นโต\n- น้ำดื่ม',
-  'อวมงคล': '- สังฆทาน\n- ดอกไม้ ธูป เทียน\n- ภัตตาหาร/ปิ่นโต\n- น้ำดื่ม\n- ผ้าบังสุกุล',
+const SUGGESTED_ITEMS: Partial<Record<CeremonyType, string>> = {
+  'มงคล': '- น้ำมนต์ (ขัน/ถัง)\n- ด้ายสายสิญจน์\n- ดอกไม้ ธูป เทียน\n- ภัตตาหาร\n- น้ำดื่ม',
+  'อวมงคล': '- สังฆทาน\n- ดอกไม้ ธูป เทียน\n- ภัตตาหาร\n- น้ำดื่ม\n- ผ้าบังสุกุล',
+  'ใส่บาตรและเจริญพระพุทธมนต์': '- ข้าวสาร อาหารแห้ง\n- ดอกไม้ ธูป เทียน',
 };
 
-const SUGGESTED_TIME: Record<CeremonyType, string> = {
-  'มงคล': 'แนะนำ: เช้า 09:00 น. หรือ สาย 10:30 น. เผื่อเวลาเดินทาง 30-60 นาที',
-  'อวมงคล': 'แนะนำ: เช้า 07:00 น. หรือ บ่าย 14:00 น. เผื่อเวลาเดินทาง 30-60 นาที',
+const SUGGESTED_TIME: Partial<Record<CeremonyType, string>> = {
+  'มงคล': 'แนะนำ: เช้า 09:00 น. หรือ สาย 10:30 น.',
+  'อวมงคล': 'แนะนำ: เช้า 07:00 น. หรือ บ่าย 14:00 น.',
+  'ใส่บาตรและเจริญพระพุทธมนต์': 'แนะนำ: เช้า 06:30-07:30 น.',
 };
+
+const TEMPLE_ORIGIN = 'วัดหลวงพ่อสดธรรมกายาราม';
 
 export default function AdminPage() {
   const navigate = useNavigate();
   const [ceremonyType, setCeremonyType] = useState<CeremonyType>('มงคล');
   const [monkCount, setMonkCount] = useState<number>(5);
   const [requesterName, setRequesterName] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [description, setDescription] = useState('');
   const [selectedDate, setSelectedDate] = useState<Date>();
   const [time, setTime] = useState('09:00');
@@ -61,27 +67,25 @@ export default function AdminPage() {
   const [suggestedItems, setSuggestedItems] = useState('');
   const [suggestedTime, setSuggestedTime] = useState('');
   const [needTemplePreparation, setNeedTemplePreparation] = useState(false);
-  const [templePreparationDetails, setTemplePreparationDetails] = useState('');
+  const [templePreparationItems, setTemplePreparationItems] = useState<Set<string>>(new Set());
   const [draftAssignments, setDraftAssignments] = useState<Assignment[] | null>(null);
   const [ceremonies, setCeremonies] = useState(() => loadCeremonies());
   const [requests, setRequests] = useState(() => loadRequests());
   const [showChants, setShowChants] = useState(false);
   const [showMonkSelect, setShowMonkSelect] = useState(false);
-  // New: Open for All (งานส่วนรวม)
   const [isOpenForAll, setIsOpenForAll] = useState(false);
-  const [checkInMap, setCheckInMap] = useState<Record<string, boolean>>({});
-  // New: Monk history dialog
   const [historyMonk, setHistoryMonk] = useState<Monk | null>(null);
-  // Communal ceremony management
   const [managingCeremony, setManagingCeremony] = useState<Ceremony | null>(null);
-
   const [monks, setMonksState] = useState(() => loadMonks());
+
+  // Distance estimation mock
+  const estimatedDistance = location ? `จาก ${TEMPLE_ORIGIN} → ใช้เวลาเดินทางประมาณ ${Math.floor(Math.random() * 40 + 20)} นาที` : '';
 
   const handleGenerate = () => {
     try {
-      const assignments = generateAssignments(monks, ceremonyType, monkCount);
+      const assignments = generateAssignments(monks, ceremonyType, monkCount, specifiedMonkIds.size > 0 ? specifiedMonkIds : undefined);
       setDraftAssignments(assignments);
-      toast.success('จัดรายชื่อสำเร็จ!');
+      toast.success('🤖 จัดรายชื่อตามคะแนนจิตพิสัยสำเร็จ!');
     } catch (e: any) {
       toast.error(e.message);
     }
@@ -104,18 +108,20 @@ export default function AdminPage() {
       locationUrl: locationUrl || undefined,
       ceremonyLocation,
       selectedChantIds: selectedChantIds.size > 0 ? Array.from(selectedChantIds) : undefined,
-      suggestedItems: suggestedItems || SUGGESTED_ITEMS[ceremonyType],
-      suggestedTime: suggestedTime || SUGGESTED_TIME[ceremonyType],
+      suggestedItems: suggestedItems || SUGGESTED_ITEMS[ceremonyType] || '',
+      suggestedTime: suggestedTime || SUGGESTED_TIME[ceremonyType] || '',
       needTemplePreparation,
-      templePreparationDetails: needTemplePreparation ? templePreparationDetails : undefined,
+      templePreparationItems: templePreparationItems.size > 0 ? Array.from(templePreparationItems) : undefined,
       isOpenForAll,
       checkInResults: isOpenForAll ? monks.map(m => ({ monkId: m.id, attended: false })) : undefined,
+      phoneNumber: phoneNumber || undefined,
     };
     const updated = [newCeremony, ...ceremonies];
     setCeremonies(updated);
     saveCeremonies(updated);
     setDraftAssignments(null);
     setRequesterName('');
+    setPhoneNumber('');
     setDescription('');
     setLocation('');
     setLocationUrl('');
@@ -123,26 +129,21 @@ export default function AdminPage() {
     setSelectedChantIds(new Set());
     setSpecifiedMonkIds(new Set());
     setNeedTemplePreparation(false);
-    setTemplePreparationDetails('');
+    setTemplePreparationItems(new Set());
     setIsOpenForAll(false);
-    setCheckInMap({});
-    toast.success(isOpenForAll ? 'สร้างงานส่วนรวมเรียบร้อย' : 'ส่งรายชื่อไปยังหัวหน้าตึกเรียบร้อย');
+    toast.success(isOpenForAll ? '✅ สร้างงานส่วนรวมเรียบร้อย' : '✅ ส่งคำเชิญไปยังพระ/สามเณรเรียบร้อย');
   };
 
-  // Complete a ceremony and record history for each monk
   const handleCompleteCeremony = (ceremony: Ceremony) => {
     const ceremonyName = ceremony.description || `${ceremony.type} — ${ceremony.monkCount} รูป`;
     let updatedMonks = [...monks];
 
     if (ceremony.isOpenForAll && ceremony.checkInResults) {
-      // Communal: record for all, +1 activityScore for attendees
       for (const entry of ceremony.checkInResults) {
         updatedMonks = updatedMonks.map(m => {
           if (m.id !== entry.monkId) return m;
           const historyEntry: AssignmentHistoryEntry = {
-            ceremonyId: ceremony.id,
-            ceremonyName,
-            date: ceremony.date,
+            ceremonyId: ceremony.id, ceremonyName, date: ceremony.date,
             status: entry.attended ? 'attended' : 'rejected',
           };
           return {
@@ -153,17 +154,14 @@ export default function AdminPage() {
         });
       }
     } else {
-      // Normal ceremony: record for assigned monks
       for (const a of ceremony.assignments) {
-        const wasSubstituted = a.status === 'substituted' || a.status === 'rejected_sick' || a.status === 'rejected_skip';
+        const wasSubstituted = a.status === 'substituted' || a.status === 'rejected';
         updatedMonks = updatedMonks.map(m => {
           if (m.id !== a.monk.id) return m;
           const historyEntry: AssignmentHistoryEntry = {
-            ceremonyId: ceremony.id,
-            ceremonyName,
-            date: ceremony.date,
+            ceremonyId: ceremony.id, ceremonyName, date: ceremony.date,
             status: wasSubstituted ? 'substituted' : 'attended',
-            role: a.role,
+            role: a.role, rejectReason: a.rejectReason,
           };
           return {
             ...m,
@@ -175,39 +173,30 @@ export default function AdminPage() {
 
     setMonksState(updatedMonks);
     saveMonks(updatedMonks);
-
-    // Mark ceremony as completed
     const updatedCeremonies = ceremonies.map(c =>
       c.id === ceremony.id ? { ...c, status: 'completed' as const } : c
     );
     setCeremonies(updatedCeremonies);
     saveCeremonies(updatedCeremonies);
     setManagingCeremony(null);
-    toast.success('บันทึกจบงานและประวัติเรียบร้อย');
+    toast.success('✅ บันทึกจบงานและประวัติเรียบร้อย');
   };
 
-  // Toggle check-in for communal ceremony
   const toggleCheckIn = (ceremonyId: string, monkId: string) => {
     const updatedCeremonies = ceremonies.map(c => {
       if (c.id !== ceremonyId || !c.checkInResults) return c;
-      return {
-        ...c,
-        checkInResults: c.checkInResults.map(cr =>
-          cr.monkId === monkId ? { ...cr, attended: !cr.attended } : cr
-        ),
-      };
+      return { ...c, checkInResults: c.checkInResults.map(cr => cr.monkId === monkId ? { ...cr, attended: !cr.attended } : cr) };
     });
     setCeremonies(updatedCeremonies);
     saveCeremonies(updatedCeremonies);
-    // Also update managing ceremony state
     if (managingCeremony?.id === ceremonyId) {
-      const updated = updatedCeremonies.find(c => c.id === ceremonyId);
-      if (updated) setManagingCeremony(updated);
+      setManagingCeremony(updatedCeremonies.find(c => c.id === ceremonyId) || null);
     }
   };
 
   const handleApproveRequest = (req: CeremonyRequest) => {
     setRequesterName(req.requesterName);
+    setPhoneNumber(req.phoneNumber || '');
     setCeremonyType(req.ceremonyType);
     setMonkCount(req.monkCount);
     setDescription(req.description);
@@ -216,10 +205,7 @@ export default function AdminPage() {
     setTime(req.time);
     setCeremonyLocation(req.ceremonyLocation);
     setNeedTemplePreparation(req.needTemplePreparation);
-    setTemplePreparationDetails(req.templePreparationDetails || '');
-    if (req.date) {
-      try { setSelectedDate(new Date(req.date)); } catch {}
-    }
+    if (req.date) { try { setSelectedDate(new Date(req.date)); } catch {} }
     const updatedReqs = requests.map(r => r.id === req.id ? { ...r, status: 'approved' as const } : r);
     setRequests(updatedReqs);
     saveRequests(updatedReqs);
@@ -236,12 +222,11 @@ export default function AdminPage() {
   const pendingRequests = requests.filter(r => r.status === 'waiting');
 
   const toggleChant = (id: string) => {
-    setSelectedChantIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    setSelectedChantIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  };
+
+  const togglePrepItem = (item: string) => {
+    setTemplePreparationItems(prev => { const next = new Set(prev); if (next.has(item)) next.delete(item); else next.add(item); return next; });
   };
 
   return (
@@ -249,12 +234,12 @@ export default function AdminPage() {
       <header className="gradient-maroon px-4 py-6 shadow-lg">
         <div className="container mx-auto max-w-4xl">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/20">
               <span className="text-xl">🛕</span>
             </div>
             <div>
-              <h1 className="text-xl font-bold text-cream">ระบบบริหารจัดการกิจนิมนต์</h1>
-              <p className="text-sm text-cream/70">Admin — สร้างงานและจัดรายชื่อ</p>
+              <h1 className="text-xl font-bold text-primary-foreground">ระบบบริหารจัดการกิจนิมนต์</h1>
+              <p className="text-sm text-primary-foreground/70">Admin — สร้างงานและจัดรายชื่อ</p>
             </div>
           </div>
         </div>
@@ -269,9 +254,6 @@ export default function AdminPage() {
           <Button variant="outline" size="sm" className="gap-1" onClick={() => navigate('/')}>
             <CalendarIcon className="h-4 w-4" /> หน้าหลัก
           </Button>
-          <Button variant="outline" size="sm" className="gap-1" onClick={() => navigate('/building-head')}>
-            🏛️ หัวหน้าตึก <ChevronRight className="h-4 w-4" />
-          </Button>
           <Button variant="outline" size="sm" className="gap-1" onClick={() => navigate('/queue')}>
             <Users className="h-4 w-4" /> ดูคิว
           </Button>
@@ -280,9 +262,9 @@ export default function AdminPage() {
           </Button>
         </div>
 
-        {/* Pending Requests from Laypeople */}
+        {/* Pending Requests */}
         {pendingRequests.length > 0 && (
-          <Card className="shadow-card border-accent/30 animate-fade-in">
+          <Card className="shadow-card border-primary/30 animate-fade-in">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
                 🙏 คำขอนิมนต์จากโยม ({pendingRequests.length})
@@ -290,28 +272,12 @@ export default function AdminPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               {pendingRequests.map(req => (
-                <div key={req.id} className="rounded-lg border p-4 space-y-2 bg-accent/5 border-accent/20">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold">{req.requesterName} — {req.ceremonyType} ({req.monkCount} รูป)</p>
-                      <p className="text-xs text-muted-foreground">
-                        {req.date} · {req.time} · {req.location} · {req.ceremonyLocation}
-                      </p>
-                      {req.additionalDetails && (
-                        <p className="text-xs text-muted-foreground mt-1">{req.additionalDetails}</p>
-                      )}
-                      {req.needTemplePreparation && (
-                        <Badge variant="warning" className="text-xs mt-1">
-                          <Package className="h-3 w-3 mr-1" /> ขอให้วัดเตรียมสังฆทาน
-                        </Badge>
-                      )}
-                    </div>
+                <div key={req.id} className="rounded-lg border p-4 space-y-2 bg-primary/5 border-primary/20">
+                  <div>
+                    <p className="font-semibold">{req.requesterName} — {req.ceremonyType} ({req.monkCount} รูป)</p>
+                    <p className="text-xs text-muted-foreground">{req.date} · {req.time} · {req.location} · {req.ceremonyLocation}</p>
+                    {req.phoneNumber && <p className="text-xs text-muted-foreground">📞 {req.phoneNumber}</p>}
                   </div>
-                  {req.locationUrl && (
-                    <a href={req.locationUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-accent underline flex items-center gap-1">
-                      <MapPin className="h-3 w-3" /> ดูแผนที่
-                    </a>
-                  )}
                   <div className="flex gap-2 pt-1">
                     <Button variant="gold" size="sm" className="gap-1" onClick={() => handleApproveRequest(req)}>
                       <CheckCircle className="h-4 w-4" /> รับคำขอ & สร้างงาน
@@ -330,31 +296,26 @@ export default function AdminPage() {
         <Card className="shadow-card border-gold-subtle animate-fade-in">
           <CardHeader className="pb-4">
             <CardTitle className="flex items-center gap-2 text-lg">
-              <CalendarIcon className="h-5 w-5 text-accent" />
+              <CalendarIcon className="h-5 w-5 text-primary" />
               สร้างงานกิจนิมนต์ใหม่
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* งานส่วนรวม Toggle */}
-            <div className="flex items-center justify-between rounded-lg border border-accent/30 bg-accent/5 p-4">
-              <div className="flex items-center gap-3">
-                <Globe className="h-5 w-5 text-accent" />
-                <div>
-                  <p className="text-sm font-semibold">งานส่วนรวม (Open for All)</p>
-                  <p className="text-xs text-muted-foreground">ไม่จำกัดโควตา — เช็กชื่อทุกรูป · บวกคะแนนจิตพิสัย +1</p>
-                </div>
-              </div>
-              <Switch checked={isOpenForAll} onCheckedChange={setIsOpenForAll} />
-            </div>
-
+            {/* Ceremony Type */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>ประเภทงาน</Label>
-                <Select value={ceremonyType} onValueChange={(v) => setCeremonyType(v as CeremonyType)}>
+                <Select value={ceremonyType} onValueChange={(v) => {
+                  setCeremonyType(v as CeremonyType);
+                  if (v === 'งานส่วนรวมของวัด') setIsOpenForAll(true);
+                  else setIsOpenForAll(false);
+                }}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="มงคล">🟢 งานมงคล</SelectItem>
                     <SelectItem value="อวมงคล">🔴 งานอวมงคล</SelectItem>
+                    <SelectItem value="ใส่บาตรและเจริญพระพุทธมนต์">🟡 ใส่บาตรและเจริญพระพุทธมนต์</SelectItem>
+                    <SelectItem value="งานส่วนรวมของวัด">🏛️ งานส่วนรวมของวัด</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -373,24 +334,57 @@ export default function AdminPage() {
               )}
             </div>
 
+            {/* งานส่วนรวม indicator */}
+            {isOpenForAll && (
+              <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4">
+                <Globe className="h-5 w-5 text-primary" />
+                <div>
+                  <p className="text-sm font-semibold">งานส่วนรวม (Open for All)</p>
+                  <p className="text-xs text-muted-foreground">ไม่จำกัดโควตา — เช็กชื่อทุกรูป · บวกคะแนนจิตพิสัย +1</p>
+                </div>
+              </div>
+            )}
+
+            {/* Requester info */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>ชื่อเจ้าภาพ / ชื่องาน</Label>
                 <Input placeholder="ระบุชื่อเจ้าภาพหรือชื่องาน" value={requesterName} onChange={(e) => setRequesterName(e.target.value)} />
               </div>
               <div className="space-y-2">
+                <Label>เบอร์โทรศัพท์</Label>
+                <Input
+                  placeholder="0xxxxxxxxx"
+                  value={phoneNumber}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/[^0-9]/g, '');
+                    setPhoneNumber(val);
+                  }}
+                  inputMode="numeric"
+                  maxLength={10}
+                />
+              </div>
+            </div>
+
+            {/* Location */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
                 <Label>สถานที่จัด</Label>
                 <Select value={ceremonyLocation} onValueChange={(v) => setCeremonyLocation(v as CeremonyLocation)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ในวัด">🏛️ ในวัด</SelectItem>
-                    <SelectItem value="นอกวัด">🏠 นอกวัด</SelectItem>
+                    <SelectItem value="ในวัด">🏛️ ภายในวัด</SelectItem>
+                    <SelectItem value="นอกวัด">🏠 นอกสถานที่</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-2">
+                <Label>เวลา</Label>
+                <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+              </div>
             </div>
 
-            {/* Date & Time */}
+            {/* Date */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>วันที่</Label>
@@ -402,31 +396,81 @@ export default function AdminPage() {
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} initialFocus className={cn("p-3 pointer-events-auto")} />
+                    <Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} initialFocus className="p-3 pointer-events-auto" />
                   </PopoverContent>
                 </Popover>
               </div>
               <div className="space-y-2">
-                <Label>เวลา</Label>
-                <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+                <Label>รายละเอียด</Label>
+                <Input placeholder="บ้าน, สถานที่, หมายเหตุ" value={description} onChange={(e) => setDescription(e.target.value)} />
               </div>
             </div>
 
-            {/* Description */}
-            <div className="space-y-2">
-              <Label>รายละเอียด</Label>
-              <Input placeholder="บ้าน, สถานที่, หมายเหตุ" value={description} onChange={(e) => setDescription(e.target.value)} />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="flex items-center gap-1"><MapPin className="h-4 w-4 text-accent" /> สถานที่</Label>
-                <Input placeholder="ที่อยู่สถานที่จัดงาน" value={location} onChange={(e) => setLocation(e.target.value)} />
+            {/* Location + Maps */}
+            {ceremonyLocation === 'นอกวัด' && (
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1"><Search className="h-4 w-4 text-primary" /> ค้นหาสถานที่ (จำลอง Google Maps)</Label>
+                  <Input placeholder="พิมพ์ค้นหาสถานที่..." value={location} onChange={(e) => setLocation(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>ลิงก์ Google Maps</Label>
+                  <Input placeholder="https://maps.google.com/..." value={locationUrl} onChange={(e) => setLocationUrl(e.target.value)} />
+                </div>
+                {location && (
+                  <div className="rounded-lg border bg-muted/50 p-4 space-y-2">
+                    <div className="rounded-lg bg-muted h-32 flex items-center justify-center border">
+                      <div className="text-center text-muted-foreground">
+                        <MapPin className="h-8 w-8 mx-auto mb-1" />
+                        <p className="text-xs font-medium">📍 {location}</p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-primary font-medium">🚗 {estimatedDistance}</p>
+                  </div>
+                )}
               </div>
-              <div className="space-y-2">
-                <Label>ลิงก์ Google Maps</Label>
-                <Input placeholder="https://maps.google.com/..." value={locationUrl} onChange={(e) => setLocationUrl(e.target.value)} />
+            )}
+
+            {/* Temple preparation (ผาติกรรม) — only if ในวัด */}
+            {ceremonyLocation === 'ในวัด' && (
+              <div className="space-y-3 rounded-lg border bg-muted/30 p-4">
+                <div className="flex items-center gap-3">
+                  <Package className="h-5 w-5 text-primary" />
+                  <Label className="font-semibold">ให้ทางวัดเตรียมให้ (ทำผาติกรรม)</Label>
+                </div>
+                <div className="flex flex-wrap gap-4 pl-2">
+                  {['สังฆทาน', 'ดอกไม้', 'ผ้าไตร'].map(item => (
+                    <div key={item} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`prep-${item}`}
+                        checked={templePreparationItems.has(item)}
+                        onCheckedChange={() => togglePrepItem(item)}
+                      />
+                      <Label htmlFor={`prep-${item}`} className="cursor-pointer text-sm">{item}</Label>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Preparation Guide Accordion */}
+            <Accordion type="single" collapsible>
+              <AccordionItem value="guide" className="border rounded-lg">
+                <AccordionTrigger className="px-4 text-sm">
+                  📋 คำแนะนำและสิ่งที่ต้องเตรียม (งานมงคล/อวมงคล)
+                </AccordionTrigger>
+                <AccordionContent className="px-4 pb-4 space-y-3">
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground mb-1">⏰ เรื่องเวลา:</p>
+                    <Textarea placeholder={SUGGESTED_TIME[ceremonyType] || ''} value={suggestedTime} onChange={(e) => setSuggestedTime(e.target.value)} rows={2} className="text-xs" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground mb-1">📦 สิ่งที่ต้องเตรียม:</p>
+                    <Textarea placeholder={SUGGESTED_ITEMS[ceremonyType] || ''} value={suggestedItems} onChange={(e) => setSuggestedItems(e.target.value)} rows={3} className="text-xs" />
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
 
             {!isOpenForAll && (
               <>
@@ -480,7 +524,7 @@ export default function AdminPage() {
                               }}
                             />
                             <Label htmlFor={`monk-${m.id}`} className="text-xs cursor-pointer">
-                              {m.name} ({m.rank} · {m.building})
+                              {m.name} ({m.rank} · คะแนน: {m.activityScore || 0})
                             </Label>
                           </div>
                         ))}
@@ -488,27 +532,6 @@ export default function AdminPage() {
                     </Card>
                   )}
                 </div>
-
-                {/* Suggested time & items */}
-                <Card className="bg-muted/50 border-gold-subtle">
-                  <CardContent className="pt-4 space-y-3">
-                    <div>
-                      <Label className="text-xs flex items-center gap-1"><Info className="h-3 w-3" /> แนะนำเรื่องเวลา</Label>
-                      <Textarea placeholder={SUGGESTED_TIME[ceremonyType]} value={suggestedTime} onChange={(e) => setSuggestedTime(e.target.value)} rows={2} className="mt-1 text-xs" />
-                    </div>
-                    <div>
-                      <Label className="text-xs flex items-center gap-1"><Package className="h-3 w-3" /> สิ่งที่ต้องเตรียม</Label>
-                      <Textarea placeholder={SUGGESTED_ITEMS[ceremonyType]} value={suggestedItems} onChange={(e) => setSuggestedItems(e.target.value)} rows={3} className="mt-1 text-xs" />
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Checkbox id="admin-temple-prep" checked={needTemplePreparation} onCheckedChange={(c) => setNeedTemplePreparation(!!c)} />
-                      <Label htmlFor="admin-temple-prep" className="text-xs cursor-pointer">ให้วัดเตรียมสังฆทาน (มีค่าใช้จ่ายเพิ่มเติม)</Label>
-                    </div>
-                    {needTemplePreparation && (
-                      <Textarea placeholder="รายละเอียดสิ่งที่วัดต้องเตรียม..." value={templePreparationDetails} onChange={(e) => setTemplePreparationDetails(e.target.value)} rows={2} className="text-xs" />
-                    )}
-                  </CardContent>
-                </Card>
 
                 {/* Quota preview */}
                 <div className="rounded-lg bg-muted p-3">
@@ -528,12 +551,11 @@ export default function AdminPage() {
 
                 <Button variant="gold" className="w-full gap-2" size="lg" onClick={handleGenerate}>
                   <Sparkles className="h-5 w-5" />
-                  ให้ระบบจัดรายชื่อ
+                  🤖 จัดรายชื่อตามคะแนนจิตพิสัย
                 </Button>
               </>
             )}
 
-            {/* Open for All: direct create */}
             {isOpenForAll && (
               <Button variant="gold" className="w-full gap-2" size="lg" onClick={handleConfirmDraft}>
                 <Globe className="h-5 w-5" />
@@ -543,12 +565,12 @@ export default function AdminPage() {
           </CardContent>
         </Card>
 
-        {/* Draft Results (normal ceremony) */}
+        {/* Draft Results */}
         {draftAssignments && !isOpenForAll && (
           <Card className="shadow-card border-gold-subtle animate-fade-in">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
-                <Users className="h-5 w-5 text-accent" />
+                <Users className="h-5 w-5 text-primary" />
                 รายชื่อแบบร่าง — {ceremonyType} ({monkCount} รูป)
               </CardTitle>
             </CardHeader>
@@ -559,24 +581,27 @@ export default function AdminPage() {
                     <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted font-bold text-sm">{i + 1}</span>
                     <div>
                       <p className="font-medium">{a.monk.name}</p>
-                      <p className="text-xs text-muted-foreground">{a.monk.building} · พรรษา {a.monk.yearsOrdained} · คิว #{a.monk.queueScore}</p>
+                      <p className="text-xs text-muted-foreground">{a.monk.building} · คะแนนจิตพิสัย: {a.monk.activityScore || 0}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant={rankBadgeVariant(a.monk.rank)}>{a.monk.rank}</Badge>
                     {a.role === 'หัวนำสวด' && <Badge variant="gold">🎵 หัวนำสวด</Badge>}
+                    {specifiedMonkIds.has(a.monk.id) && <Badge variant="outline" className="text-xs">เจาะจง</Badge>}
                   </div>
                 </div>
               ))}
               <div className="flex gap-2 pt-2">
-                <Button variant="gold" className="flex-1" onClick={handleConfirmDraft}>✅ ยืนยันและส่งให้หัวหน้าตึก</Button>
+                <Button variant="gold" className="flex-1" onClick={handleConfirmDraft}>
+                  💾 ยืนยันและส่งให้พระ/สามเณรกดรับงาน
+                </Button>
                 <Button variant="outline" onClick={() => setDraftAssignments(null)}>ยกเลิก</Button>
               </div>
             </CardContent>
           </Card>
         )}
 
-        {/* Recent Ceremonies with Complete & History */}
+        {/* Recent Ceremonies */}
         {ceremonies.length > 0 && (
           <Card className="shadow-card">
             <CardHeader className="pb-3">
@@ -588,7 +613,7 @@ export default function AdminPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-medium flex items-center gap-2">
-                        {c.isOpenForAll && <Globe className="h-4 w-4 text-accent" />}
+                        {c.isOpenForAll && <Globe className="h-4 w-4 text-primary" />}
                         {c.description || c.type} — {c.isOpenForAll ? 'ทั้งวัด' : `${c.monkCount} รูป`}
                       </p>
                       <p className="text-xs text-muted-foreground">{c.requesterName} · {c.date}</p>
@@ -600,10 +625,9 @@ export default function AdminPage() {
                     }>
                       {c.status === 'completed' ? '✅ จบงาน' :
                        c.status === 'confirmed' ? 'ยืนยันแล้ว' :
-                       c.status === 'pending' ? 'รออนุมัติ' : 'ร่าง'}
+                       c.status === 'pending' ? 'รอตอบรับ' : 'ร่าง'}
                     </Badge>
                   </div>
-                  {/* Action buttons */}
                   {c.status !== 'completed' && (
                     <div className="flex gap-2">
                       {c.isOpenForAll && (
@@ -622,11 +646,11 @@ export default function AdminPage() {
           </Card>
         )}
 
-        {/* Monk List with History View */}
+        {/* Monk List with History */}
         <Card className="shadow-card">
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
-              <History className="h-5 w-5 text-accent" />
+              <History className="h-5 w-5 text-primary" />
               รายชื่อพระ — ดูประวัติการรับงาน
             </CardTitle>
           </CardHeader>
@@ -673,7 +697,7 @@ export default function AdminPage() {
         <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <History className="h-5 w-5 text-accent" />
+              <History className="h-5 w-5 text-primary" />
               ประวัติการรับงาน — {historyMonk?.name}
             </DialogTitle>
           </DialogHeader>
@@ -695,6 +719,7 @@ export default function AdminPage() {
                       <TableHead className="text-xs">ชื่องาน</TableHead>
                       <TableHead className="text-xs">หน้าที่</TableHead>
                       <TableHead className="text-xs text-center">สถานะ</TableHead>
+                      <TableHead className="text-xs">เหตุผล</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -707,9 +732,10 @@ export default function AdminPage() {
                           {h.status === 'attended' ? (
                             <Badge variant="success" className="text-[10px]">✅ ไปงาน</Badge>
                           ) : (
-                            <Badge variant="destructive" className="text-[10px]">❌ เปลี่ยนตัว</Badge>
+                            <Badge variant="destructive" className="text-[10px]">❌ ปฏิเสธ</Badge>
                           )}
                         </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{h.rejectReason || '-'}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -720,12 +746,12 @@ export default function AdminPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Check-in Dialog for Communal Ceremony */}
+      {/* Check-in Dialog */}
       <Dialog open={!!managingCeremony} onOpenChange={() => setManagingCeremony(null)}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Globe className="h-5 w-5 text-accent" />
+              <Globe className="h-5 w-5 text-primary" />
               เช็กชื่องานส่วนรวม — {managingCeremony?.description || managingCeremony?.type}
             </DialogTitle>
           </DialogHeader>
@@ -733,20 +759,18 @@ export default function AdminPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">เข้าร่วม: <strong className="text-success">{managingCeremony.checkInResults.filter(cr => cr.attended).length}</strong> / {managingCeremony.checkInResults.length} รูป</span>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => {
-                    const allChecked = managingCeremony.checkInResults!.every(cr => cr.attended);
-                    const updatedCeremonies = ceremonies.map(c => {
-                      if (c.id !== managingCeremony.id) return c;
-                      return { ...c, checkInResults: c.checkInResults!.map(cr => ({ ...cr, attended: !allChecked })) };
-                    });
-                    setCeremonies(updatedCeremonies);
-                    saveCeremonies(updatedCeremonies);
-                    setManagingCeremony(updatedCeremonies.find(c => c.id === managingCeremony.id) || null);
-                  }}>
-                    {managingCeremony.checkInResults.every(cr => cr.attended) ? 'ยกเลิกทั้งหมด' : 'เลือกทั้งหมด'}
-                  </Button>
-                </div>
+                <Button variant="outline" size="sm" onClick={() => {
+                  const allChecked = managingCeremony.checkInResults!.every(cr => cr.attended);
+                  const updatedCeremonies = ceremonies.map(c => {
+                    if (c.id !== managingCeremony.id) return c;
+                    return { ...c, checkInResults: c.checkInResults!.map(cr => ({ ...cr, attended: !allChecked })) };
+                  });
+                  setCeremonies(updatedCeremonies);
+                  saveCeremonies(updatedCeremonies);
+                  setManagingCeremony(updatedCeremonies.find(c => c.id === managingCeremony.id) || null);
+                }}>
+                  {managingCeremony.checkInResults.every(cr => cr.attended) ? 'ยกเลิกทั้งหมด' : 'เลือกทั้งหมด'}
+                </Button>
               </div>
               <div className="space-y-1">
                 {managingCeremony.checkInResults.map(cr => {
@@ -756,7 +780,7 @@ export default function AdminPage() {
                     <div
                       key={cr.monkId}
                       className={cn(
-                        "flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all select-none",
+                        "flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all select-none active:scale-[0.98]",
                         cr.attended ? "bg-success/10 border-success/30" : "bg-background hover:bg-muted/50"
                       )}
                       onClick={() => toggleCheckIn(managingCeremony.id, cr.monkId)}
@@ -778,12 +802,7 @@ export default function AdminPage() {
                   );
                 })}
               </div>
-              <Button
-                variant="gold"
-                className="w-full gap-2"
-                size="lg"
-                onClick={() => handleCompleteCeremony(managingCeremony)}
-              >
+              <Button variant="gold" className="w-full gap-2" size="lg" onClick={() => handleCompleteCeremony(managingCeremony)}>
                 <CheckCircle className="h-5 w-5" />
                 บันทึกจบงานส่วนรวม (+1 คะแนนจิตพิสัยผู้เข้าร่วม)
               </Button>
