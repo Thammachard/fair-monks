@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Ceremony, Monk } from '@/lib/types';
+import { Ceremony, Monk, AssignmentHistoryEntry } from '@/lib/types';
 import { loadCeremonies, loadMonks } from '@/lib/storage';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -234,7 +234,34 @@ export default function HomePage() {
           </CardContent>
         </Card>
 
-        {/* 4. Action Button — only จัดการบทสวด */}
+        {/* 4. Assignment History Table */}
+        {(loggedInMonk.assignmentHistory || []).length > 0 && (
+          <Card className="shadow-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <FileText className="h-4 w-4 text-secondary" />
+                ประวัติการรับงานของท่าน
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1.5 max-h-[250px] overflow-y-auto">
+                {(loggedInMonk.assignmentHistory || []).slice().reverse().map((h: AssignmentHistoryEntry, i: number) => (
+                  <div key={i} className="flex items-center justify-between rounded-md border px-3 py-2 text-xs">
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{h.ceremonyName}</p>
+                      <p className="text-muted-foreground">{h.date} {h.role ? `· ${h.role}` : ''}</p>
+                    </div>
+                    <Badge variant={h.status === 'attended' ? 'success' : 'destructive'} className="text-[10px] shrink-0">
+                      {h.status === 'attended' ? '✅ ไปงาน' : '❌ เปลี่ยนตัว'}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* 5. Action Button — only จัดการบทสวด */}
         <Button
           variant="outline"
           className="w-full h-auto py-4 flex-col gap-2 bg-card hover:bg-secondary/5 border-secondary/30"

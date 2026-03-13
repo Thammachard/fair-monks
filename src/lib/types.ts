@@ -10,6 +10,14 @@ export type AssignmentStatus = 'draft' | 'pending' | 'approved' | 'rejected_sick
 
 export type CeremonyLocation = 'ในวัด' | 'นอกวัด';
 
+export interface AssignmentHistoryEntry {
+  ceremonyId: string;
+  ceremonyName: string;
+  date: string;
+  status: 'attended' | 'rejected' | 'substituted';
+  role?: 'หัวนำสวด' | 'ผู้สวด';
+}
+
 export interface Monk {
   id: string;
   name: string;
@@ -24,6 +32,7 @@ export interface Monk {
   chantIds?: string[];              // บทสวดที่สวดได้
   activityScore?: number;           // คะแนนกิจ 1-5
   leadCriteria?: LeadChanterCriteria; // เกณฑ์หัวนำสวด
+  assignmentHistory?: AssignmentHistoryEntry[]; // ประวัติการรับงาน
 }
 
 export interface QuotaConfig {
@@ -83,6 +92,11 @@ export interface CeremonyRequest {
   suggestedTime?: string;
 }
 
+export interface CheckInEntry {
+  monkId: string;
+  attended: boolean;
+}
+
 export interface Ceremony {
   id: string;
   date: string;
@@ -92,7 +106,7 @@ export interface Ceremony {
   requesterName: string;
   description: string;
   assignments: Assignment[];
-  status: 'draft' | 'pending' | 'confirmed';
+  status: 'draft' | 'pending' | 'confirmed' | 'completed';
   createdAt: string;
   location?: string;
   locationUrl?: string;
@@ -103,6 +117,8 @@ export interface Ceremony {
   needTemplePreparation?: boolean;
   templePreparationDetails?: string;
   requestId?: string;
+  isOpenForAll?: boolean;           // งานส่วนรวม
+  checkInResults?: CheckInEntry[];  // ผลเช็กชื่องานส่วนรวม
 }
 
 // Quota configs for different ceremony sizes
