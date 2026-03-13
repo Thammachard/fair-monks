@@ -92,6 +92,11 @@ export interface CeremonyRequest {
   suggestedTime?: string;
 }
 
+export interface CheckInEntry {
+  monkId: string;
+  attended: boolean;
+}
+
 export interface Ceremony {
   id: string;
   date: string;
@@ -101,7 +106,7 @@ export interface Ceremony {
   requesterName: string;
   description: string;
   assignments: Assignment[];
-  status: 'draft' | 'pending' | 'confirmed';
+  status: 'draft' | 'pending' | 'confirmed' | 'completed';
   createdAt: string;
   location?: string;
   locationUrl?: string;
@@ -112,6 +117,8 @@ export interface Ceremony {
   needTemplePreparation?: boolean;
   templePreparationDetails?: string;
   requestId?: string;
+  isOpenForAll?: boolean;           // งานส่วนรวม
+  checkInResults?: CheckInEntry[];  // ผลเช็กชื่องานส่วนรวม
 }
 
 // Quota configs for different ceremony sizes
