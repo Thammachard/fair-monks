@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Monk, RANK_ORDER, MonkRank } from '@/lib/types';
 import { loadMonks } from '@/lib/storage';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Snowflake, Users, Crown, ChevronDown, ChevronUp } from 'lucide-react';
@@ -32,8 +32,8 @@ export default function QueuePage() {
     });
   };
 
-  // Global queue position across all ranks
-  const globalSorted = [...monks].sort((a, b) => a.queueScore - b.queueScore);
+  // Sort by ordination years descending (seniority)
+  const globalSorted = [...monks].sort((a, b) => b.yearsOrdained - a.yearsOrdained);
 
   return (
     <div className="min-h-screen bg-background">
@@ -44,8 +44,8 @@ export default function QueuePage() {
               <span className="text-xl">📊</span>
             </div>
             <div>
-              <h1 className="text-xl font-bold text-cream">ลำดับคิวพระ</h1>
-              <p className="text-sm text-cream/70">เรียงตามลำดับความยุติธรรม</p>
+              <h1 className="text-xl font-bold text-cream">กระดานรายชื่อพระ</h1>
+              <p className="text-sm text-cream/70">แสดงสถานะความพร้อม (ไม่แสดงคะแนน)</p>
             </div>
           </div>
         </div>
@@ -60,7 +60,7 @@ export default function QueuePage() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {RANK_ORDER.map(rank => {
             const count = monks.filter(m => m.rank === rank).length;
-            const frozen = monks.filter(m => m.rank === rank && m.isFrozen).length;
+            const frozen = monks.filter(m => m.rank === rank && (m.isFrozen || m.availability === 'ไม่พร้อมรับงาน')).length;
             const cfg = rankConfig[rank];
             return (
               <Card
@@ -84,7 +84,7 @@ export default function QueuePage() {
           })}
         </div>
 
-        {/* Queue by Rank */}
+        {/* Queue by Rank — NO scores shown */}
         <div className="space-y-3">
           {RANK_ORDER.map(rank => {
             const cfg = rankConfig[rank];
@@ -93,7 +93,6 @@ export default function QueuePage() {
 
             return (
               <Card key={rank} className={`shadow-card overflow-hidden border-l-4 ${cfg.color}`}>
-                {/* Rank Header — clickable to collapse */}
                 <button
                   className={`w-full flex items-center justify-between px-4 py-3 ${cfg.bgClass} hover:opacity-80 transition-opacity`}
                   onClick={() => toggleRank(rank)}
@@ -112,72 +111,47 @@ export default function QueuePage() {
 
                 {isExpanded && (
                   <CardContent className="p-0">
-                    {/* Table Header */}
-                    <div className="grid grid-cols-[2.5rem_1fr_4rem_4rem] sm:grid-cols-[3rem_1fr_5rem_5rem_5rem] items-center px-4 py-2 border-b bg-muted/30 text-xs font-medium text-muted-foreground">
+                    {/* Table Header — NO คิว/คะแนน columns */}
+                    <div className="grid grid-cols-[2.5rem_1fr_4rem_4rem] sm:grid-cols-[3rem_1fr_5rem_5rem] items-center px-4 py-2 border-b bg-muted/30 text-xs font-medium text-muted-foreground">
                       <span className="text-center">#</span>
                       <span>ชื่อ</span>
-                      <span className="text-center hidden sm:block">งาน</span>
+                      <span className="text-center hidden sm:block">พรรษา</span>
                       <span className="text-center">สถานะ</span>
-                      <span className="text-center">คิว</span>
                     </div>
 
-                    {/* Monk Rows */}
-                    {rankMonks.map((m, i) => {
-                      const globalPos = globalSorted.findIndex(g => g.id === m.id) + 1;
-                      return (
-                        <div
-                          key={m.id}
-                          className={`grid grid-cols-[2.5rem_1fr_4rem_4rem] sm:grid-cols-[3rem_1fr_5rem_5rem_5rem] items-center px-4 py-2.5 border-b last:border-b-0 text-sm transition-colors animate-slide-in ${
-                            m.isFrozen
-                              ? 'bg-blue-50/50 dark:bg-blue-950/20'
-                              : i % 2 === 0
-                                ? 'bg-background'
-                                : 'bg-muted/10'
-                          }`}
-                          style={{ animationDelay: `${i * 30}ms` }}
-                        >
-                          {/* Rank position */}
-                          <span className="text-center font-mono text-muted-foreground text-xs">
-                            {i + 1}
-                          </span>
-
-                          {/* Name */}
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="font-medium truncate">{m.name}</span>
-                            {m.isFrozen && <Snowflake className="h-3.5 w-3.5 text-blue-500 shrink-0" />}
-                          </div>
-
-                          {/* Total assignments — hidden on small */}
-                          <span className="text-center text-xs text-muted-foreground hidden sm:block">
-                            {m.totalAssignments} ครั้ง
-                          </span>
-
-                          {/* Status */}
-                          <div className="flex justify-center">
-                            {m.isFrozen ? (
-                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-blue-300 text-blue-600">
-                                พักงาน
-                              </Badge>
-                            ) : (
-                              <Badge variant="success" className="text-[10px] px-1.5 py-0">
-                                พร้อม
-                              </Badge>
-                            )}
-                          </div>
-
-                          {/* Global queue score */}
-                          <div className="flex justify-center">
-                            <span className={`text-xs font-mono px-2 py-0.5 rounded-full ${
-                              globalPos <= 5
-                                ? 'bg-accent text-accent-foreground font-bold'
-                                : 'text-muted-foreground'
-                            }`}>
-                              #{globalPos}
-                            </span>
-                          </div>
+                    {rankMonks.map((m, i) => (
+                      <div
+                        key={m.id}
+                        className={`grid grid-cols-[2.5rem_1fr_4rem_4rem] sm:grid-cols-[3rem_1fr_5rem_5rem] items-center px-4 py-2.5 border-b last:border-b-0 text-sm transition-colors animate-slide-in ${
+                          m.isFrozen || m.availability === 'ไม่พร้อมรับงาน'
+                            ? 'bg-blue-50/50 dark:bg-blue-950/20'
+                            : i % 2 === 0
+                              ? 'bg-background'
+                              : 'bg-muted/10'
+                        }`}
+                        style={{ animationDelay: `${i * 30}ms` }}
+                      >
+                        <span className="text-center font-mono text-muted-foreground text-xs">{i + 1}</span>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-medium truncate">{m.name}</span>
+                          {m.isFrozen && <Snowflake className="h-3.5 w-3.5 text-blue-500 shrink-0" />}
                         </div>
-                      );
-                    })}
+                        <span className="text-center text-xs text-muted-foreground hidden sm:block">
+                          {m.yearsOrdained} พรรษา
+                        </span>
+                        <div className="flex justify-center">
+                          {m.isFrozen || m.availability === 'ไม่พร้อมรับงาน' ? (
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-blue-300 text-blue-600">
+                              พักงาน
+                            </Badge>
+                          ) : (
+                            <Badge variant="success" className="text-[10px] px-1.5 py-0">
+                              พร้อม
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </CardContent>
                 )}
               </Card>
@@ -191,16 +165,19 @@ export default function QueuePage() {
             <p className="text-xs text-muted-foreground font-medium mb-2">คำอธิบาย</p>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
-                <span className="inline-block w-5 text-center font-mono bg-accent text-accent-foreground rounded-full px-1 text-[10px]">#1</span>
-                ลำดับคิวรวม (ยิ่งน้อย = ได้งานก่อน)
+                <Badge variant="success" className="text-[10px] px-1.5 py-0">พร้อม</Badge>
+                พร้อมรับกิจนิมนต์
               </span>
               <span className="flex items-center gap-1">
-                <Snowflake className="h-3 w-3 text-blue-500" /> พักงาน (อาพาธ)
+                <Snowflake className="h-3 w-3 text-blue-500" /> พักงาน / ไม่พร้อม
               </span>
               <span className="flex items-center gap-1">
-                <Users className="h-3 w-3" /> งาน = จำนวนกิจนิมนต์ทั้งหมด
+                <Users className="h-3 w-3" /> เรียงตามอาวุโส (พรรษา)
               </span>
             </div>
+            <p className="text-[10px] text-muted-foreground mt-2 italic">
+              🔒 คะแนนจิตพิสัยจะไม่แสดงในหน้านี้ เพื่อความเป็นส่วนตัว
+            </p>
           </CardContent>
         </Card>
       </main>

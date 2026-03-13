@@ -57,7 +57,6 @@ export default function HomePage() {
   const [monks, setMonks] = useState<Monk[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date(2026, 2, 13));
   const [isMonkUser, setIsMonkUser] = useState(false);
-  // Reject dialog state
   const [rejectDialog, setRejectDialog] = useState<{ ceremonyId: string; monkId: string } | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [rejectCustomReason, setRejectCustomReason] = useState('');
@@ -105,7 +104,6 @@ export default function HomePage() {
   const handleToggleAvailability = (available: boolean) => {
     if (!loggedInMonk) return;
     if (!available) {
-      // Force unavailable reason via prompt
       const reason = prompt('กรุณาระบุเหตุผลที่ไม่พร้อมรับงาน (เช่น กลับบ้าน, อาพาธ)');
       if (!reason || !reason.trim()) {
         toast.error('กรุณาระบุเหตุผล');
@@ -141,7 +139,6 @@ export default function HomePage() {
         ),
       };
     });
-    // Check if all approved → mark confirmed
     const ceremony = updatedCeremonies.find(c => c.id === ceremonyId);
     if (ceremony && ceremony.assignments.every(a => a.status === 'approved')) {
       const finalCeremonies = updatedCeremonies.map(c =>
@@ -153,7 +150,6 @@ export default function HomePage() {
       setCeremonies(updatedCeremonies);
       saveCeremonies(updatedCeremonies);
     }
-    // Update monk totalAssignments
     const updatedMonks = monks.map(m => m.id === monkId ? { ...m, totalAssignments: m.totalAssignments + 1 } : m);
     setMonks(updatedMonks);
     saveMonks(updatedMonks);
@@ -172,7 +168,6 @@ export default function HomePage() {
     const ceremony = ceremonies.find(c => c.id === ceremonyId);
     if (!ceremony) return;
 
-    // Find substitute automatically
     const excludeIds = new Set(ceremony.assignments.map(a => a.monk.id));
     const rejectedMonk = monks.find(m => m.id === monkId);
     const sub = findSubstitute(monks, ceremony.type as any, excludeIds, rejectedMonk?.rank);
@@ -183,19 +178,10 @@ export default function HomePage() {
         ...c,
         assignments: c.assignments.map(a => {
           if (a.monk.id !== monkId) return a;
-          return {
-            ...a,
-            status: 'rejected' as const,
-            rejectReason: reason,
-            substitute: sub || undefined,
-          };
+          return { ...a, status: 'rejected' as const, rejectReason: reason, substitute: sub || undefined };
         }).concat(sub ? [{
-          monk: sub,
-          role: 'ผู้สวด' as const,
-          status: 'pending' as const,
-          rejectReason: undefined,
-          substitute: undefined,
-          sermonTopic: undefined,
+          monk: sub, role: 'ผู้สวด' as const, status: 'pending' as const,
+          rejectReason: undefined, substitute: undefined, sermonTopic: undefined,
         }] : []),
       };
     });
@@ -203,11 +189,10 @@ export default function HomePage() {
     setCeremonies(updatedCeremonies);
     saveCeremonies(updatedCeremonies);
 
-    // Record rejection in history
     const updatedMonks = monks.map(m => {
       if (m.id !== monkId) return m;
       const historyEntry: AssignmentHistoryEntry = {
-        ceremonyId, ceremonyName: ceremony.description || ceremony.type,
+        ceremonyId, ceremonyName: ceremony.type, // Use type, not title for privacy
         date: ceremony.date, status: 'rejected', rejectReason: reason,
       };
       return { ...m, assignmentHistory: [...(m.assignmentHistory || []), historyEntry] };
@@ -227,7 +212,6 @@ export default function HomePage() {
 
     const isAvailable = loggedInMonk.availability === 'พร้อมรับงาน';
 
-    // Pending invitations for this monk
     const pendingInvitations = ceremonies.filter(c =>
       c.status === 'pending' && c.assignments.some(a => a.monk.id === loggedInMonk.id && a.status === 'pending')
     );
@@ -273,7 +257,6 @@ export default function HomePage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Toggle availability */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-lg">{isAvailable ? '🟢' : '🔴'}</span>
@@ -284,12 +267,8 @@ export default function HomePage() {
                   )}
                 </div>
               </div>
-              <Switch
-                checked={isAvailable}
-                onCheckedChange={handleToggleAvailability}
-              />
+              <Switch checked={isAvailable} onCheckedChange={handleToggleAvailability} />
             </div>
-            {/* Accept mode dropdown */}
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">โหมดรับงาน</Label>
               <Select value={loggedInMonk.acceptMode} onValueChange={handleChangeAcceptMode}>
@@ -305,7 +284,7 @@ export default function HomePage() {
           </CardContent>
         </Card>
 
-        {/* 1.2 Pending Invitations */}
+        {/* 1.2 Pending Invitations — PRIVACY: No ceremony title shown */}
         {pendingInvitations.length > 0 && (
           <Card className="shadow-card border-primary/30 animate-fade-in">
             <CardHeader className="pb-2">
@@ -321,17 +300,27 @@ export default function HomePage() {
                 return (
                   <div key={c.id} className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-3">
                     <div>
+                      {/* PRIVACY: Show only type, date, time, location — NO ceremony name */}
                       <p className="font-semibold text-sm">
-                        {c.description || `${c.type} — ${c.monkCount} รูป`}
+                        {c.type} — {c.monkCount} รูป
                       </p>
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1"><CalendarIcon className="h-3 w-3" />{c.date}</span>
                         <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{c.time || '-'}</span>
                         {c.location && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{c.location}</span>}
+                        {c.ceremonyLocation && <span>({c.ceremonyLocation})</span>}
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">เจ้าภาพ: {c.requesterName}</p>
                       {myAssignment.role === 'หัวนำสวด' && (
                         <Badge variant="gold" className="text-xs mt-1">🎵 หน้าที่: หัวนำสวด</Badge>
+                      )}
+                      {/* Alms bowl badge */}
+                      {c.hasAlmsBowlCeremony && (
+                        <div className="mt-2 rounded-md border-2 border-accent/40 bg-accent/10 p-2 flex items-center gap-2">
+                          <span className="text-lg">🪷</span>
+                          <span className="text-xs font-semibold text-accent-foreground">
+                            งานนี้มีพิธีตักบาตร (ต้องนำบาตรติดตัวไปด้วย)
+                          </span>
+                        </div>
                       )}
                     </div>
                     <div className="flex gap-2">
@@ -353,14 +342,14 @@ export default function HomePage() {
           </Card>
         )}
 
-        {/* Stats */}
+        {/* Stats — show OWN score only */}
         <div className="grid grid-cols-2 gap-3">
           <Card className="shadow-card">
             <CardContent className="pt-4 pb-3 text-center">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 mx-auto mb-2">
                 <Star className="h-5 w-5 text-primary" />
               </div>
-              <p className="text-xs text-muted-foreground mb-1">คะแนนจิตพิสัย</p>
+              <p className="text-xs text-muted-foreground mb-1">คะแนนจิตพิสัยของท่าน</p>
               <p className="text-2xl font-bold text-primary">{loggedInMonk.activityScore || 0}</p>
             </CardContent>
           </Card>
@@ -413,7 +402,6 @@ export default function HomePage() {
           </Card>
         )}
 
-        {/* Action: จัดการบทสวด */}
         <Button
           variant="outline"
           className="w-full h-auto py-4 flex-col gap-2 bg-card hover:bg-primary/5 border-primary/20"
@@ -448,7 +436,6 @@ export default function HomePage() {
             Temple Monk Invitation &amp; Scheduling Portal
           </p>
 
-          {/* User type toggle */}
           <div className="flex items-center justify-center gap-2 mt-4">
             <span className="text-xs text-primary-foreground/60">สลับมุมมอง:</span>
             <Button
@@ -595,7 +582,7 @@ export default function HomePage() {
                             {c.ceremonyLocation && ` (${c.ceremonyLocation})`}
                           </p>
                           <p className="text-sm text-muted-foreground mt-1">
-                            {c.time || '-'} · {c.requesterName} · {c.description}
+                            {c.time || '-'} · {c.requesterName}
                           </p>
                           {c.location && (
                             <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
