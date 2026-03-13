@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Ceremony, Monk } from '@/lib/types';
+import { Ceremony, Monk, AssignmentHistoryEntry } from '@/lib/types';
 import { loadCeremonies, loadMonks } from '@/lib/storage';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
