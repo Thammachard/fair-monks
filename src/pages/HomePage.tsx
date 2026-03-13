@@ -64,26 +64,8 @@ export default function HomePage() {
     } catch { return false; }
   });
 
-  const selectedMonk = monks.find(m => m.id === selectedMonkId);
 
-  const monkAssignments = useMemo(() => {
-    if (!selectedMonk) return [];
-    return confirmedCeremonies.filter(c =>
-      c.assignments?.some(a => a.monk.id === selectedMonk.id)
-    ).slice(0, 5);
-  }, [selectedMonk, confirmedCeremonies]);
 
-  const thisMonthCount = useMemo(() => {
-    if (!selectedMonk) return 0;
-    const now = new Date();
-    return confirmedCeremonies.filter(c => {
-      try {
-        const d = parseISO(c.date);
-        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
-          && c.assignments?.some(a => a.monk.id === selectedMonk.id);
-      } catch { return false; }
-    }).length;
-  }, [selectedMonk, confirmedCeremonies]);
 
   const getTypeStyle = (type: string, location?: string) => {
     if (type === 'อวมงคล') return { bg: 'bg-muted', text: 'text-muted-foreground', dot: '⬜' };
