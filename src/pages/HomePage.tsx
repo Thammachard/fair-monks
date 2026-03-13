@@ -5,10 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
 import { useNavigate } from 'react-router-dom';
@@ -41,8 +38,6 @@ export default function HomePage() {
   const [ceremonies, setCeremonies] = useState<Ceremony[]>([]);
   const [monks, setMonks] = useState<Monk[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [selectedMonkId, setSelectedMonkId] = useState<string>('');
-  const [showDashboard, setShowDashboard] = useState(false);
 
   const laypeopleRef = useRef<HTMLElement>(null);
   const monkRef = useRef<HTMLElement>(null);
@@ -69,26 +64,8 @@ export default function HomePage() {
     } catch { return false; }
   });
 
-  const selectedMonk = monks.find(m => m.id === selectedMonkId);
 
-  const monkAssignments = useMemo(() => {
-    if (!selectedMonk) return [];
-    return confirmedCeremonies.filter(c =>
-      c.assignments?.some(a => a.monk.id === selectedMonk.id)
-    ).slice(0, 5);
-  }, [selectedMonk, confirmedCeremonies]);
 
-  const thisMonthCount = useMemo(() => {
-    if (!selectedMonk) return 0;
-    const now = new Date();
-    return confirmedCeremonies.filter(c => {
-      try {
-        const d = parseISO(c.date);
-        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
-          && c.assignments?.some(a => a.monk.id === selectedMonk.id);
-      } catch { return false; }
-    }).length;
-  }, [selectedMonk, confirmedCeremonies]);
 
   const getTypeStyle = (type: string, location?: string) => {
     if (type === 'อวมงคล') return { bg: 'bg-muted', text: 'text-muted-foreground', dot: '⬜' };
@@ -376,151 +353,201 @@ export default function HomePage() {
         <Separator />
 
         {/* ═══════════════════════════════════════════════════════════ */}
-        {/* SECTION 4: MONK & NOVICE DASHBOARD                       */}
+        {/* SECTION 4: PERSONALIZED MONK DASHBOARD (No login required) */}
         {/* ═══════════════════════════════════════════════════════════ */}
         <section ref={monkRef}>
           <div className="flex items-center gap-2 mb-1">
             <Shield className="h-5 w-5 text-secondary" />
-            <h2 className="text-lg font-bold text-foreground">ระบบเช็คคิวงาน (สำหรับคณะสงฆ์)</h2>
+            <h2 className="text-lg font-bold text-foreground">แดชบอร์ดส่วนตัวคณะสงฆ์</h2>
           </div>
           <p className="text-sm text-muted-foreground mb-4">
-            เลือกชื่อ/ฉายา เพื่อดูตารางงานกิจนิมนต์และสถิติส่วนตัว
+            ข้อมูลกิจนิมนต์และสถิติส่วนตัวของท่าน
           </p>
 
-          <Card className="shadow-card border-gold-subtle">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                📿 เข้าดูคิวงานและสถิติส่วนตัว
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex gap-2">
-                <Select value={selectedMonkId} onValueChange={setSelectedMonkId}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="เลือกชื่อ / ฉายา" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {monks.map(m => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.name} ({m.rank})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  variant="gold"
-                  disabled={!selectedMonkId}
-                  onClick={() => setShowDashboard(true)}
-                  className="gap-1 shrink-0"
-                >
-                  <BarChart3 className="h-4 w-4" />
-                  เข้าสู่ระบบ
-                </Button>
-              </div>
+          {(() => {
+            // Simulate logged-in monk (first monk in list)
+            const loggedInMonk = monks[0];
+            if (!loggedInMonk) return <p className="text-sm text-muted-foreground">กำลังโหลดข้อมูล...</p>;
 
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="gap-1 flex-1" onClick={() => navigate('/monk')}>
-                  📿 จัดการบทสวด
-                </Button>
-                <Button variant="outline" size="sm" className="gap-1 flex-1" onClick={() => navigate('/building-head')}>
-                  🏛️ หัวหน้าตึก
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </section>
+            const myAssignments = confirmedCeremonies.filter(c =>
+              c.assignments?.some(a => a.monk.id === loggedInMonk.id)
+            );
+            const now = new Date();
+            const myMonthCount = myAssignments.filter(c => {
+              try {
+                const d = parseISO(c.date);
+                return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+              } catch { return false; }
+            }).length;
+            const upcomingAssignments = myAssignments
+              .filter(c => { try { return parseISO(c.date) >= now; } catch { return false; } })
+              .sort((a, b) => a.date.localeCompare(b.date))
+              .slice(0, 3);
+            const nextEvent = upcomingAssignments[0];
+            const myRole = nextEvent?.assignments?.find(a => a.monk.id === loggedInMonk.id);
 
-        {/* Monk Dashboard Dialog */}
-        <Dialog open={showDashboard} onOpenChange={setShowDashboard}>
-          <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-lg">
-                <BarChart3 className="h-5 w-5 text-secondary" />
-                แดชบอร์ด: {selectedMonk?.name}
-              </DialogTitle>
-            </DialogHeader>
-
-            {selectedMonk && (
+            return (
               <div className="space-y-4">
-                {/* Stats Cards */}
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="rounded-lg bg-secondary/10 p-3 text-center">
-                    <p className="text-2xl font-bold text-secondary">{selectedMonk.totalAssignments}</p>
-                    <p className="text-xs text-muted-foreground">งานทั้งหมด</p>
-                  </div>
-                  <div className="rounded-lg bg-success/10 p-3 text-center">
-                    <p className="text-2xl font-bold text-success">{thisMonthCount}</p>
-                    <p className="text-xs text-muted-foreground">เดือนนี้</p>
-                  </div>
-                  <div className="rounded-lg bg-primary/10 p-3 text-center">
-                    <p className="text-2xl font-bold text-primary">{selectedMonk.queueScore}</p>
-                    <p className="text-xs text-muted-foreground">ลำดับคิว</p>
-                  </div>
-                </div>
-
-                {/* Progress bar – assignments vs average */}
-                <div className="space-y-1">
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>สถิติการออกงาน</span>
-                    <span>{selectedMonk.totalAssignments} / 20 งาน (เป้าปี)</span>
-                  </div>
-                  <Progress value={Math.min((selectedMonk.totalAssignments / 20) * 100, 100)} className="h-2" />
-                </div>
-
-                {/* Info badges */}
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="outline">ชั้น: {selectedMonk.rank}</Badge>
-                  <Badge variant="outline">พรรษา: {selectedMonk.yearsOrdained}</Badge>
-                  <Badge variant="outline">{selectedMonk.building}</Badge>
-                  <Badge variant="outline">ความสามารถ: {selectedMonk.ability}</Badge>
-                  {selectedMonk.canLead && <Badge variant="default">หัวนำสวดได้</Badge>}
-                  {selectedMonk.isFrozen && <Badge variant="destructive">ถูกระงับ</Badge>}
-                </div>
-
-                <Separator />
-
-                {/* Assignments Table */}
-                <div>
-                  <h4 className="text-sm font-semibold mb-2 flex items-center gap-1">
-                    <CalendarIcon className="h-4 w-4" /> ตารางงานกิจนิมนต์ที่จะถึง
-                  </h4>
-                  {monkAssignments.length === 0 ? (
-                    <p className="text-sm text-muted-foreground py-4 text-center">ยังไม่มีงานที่ได้รับมอบหมาย</p>
-                  ) : (
-                    <div className="rounded-lg border overflow-hidden">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="text-xs">วันที่</TableHead>
-                            <TableHead className="text-xs">เวลา</TableHead>
-                            <TableHead className="text-xs">ประเภท</TableHead>
-                            <TableHead className="text-xs">สถานที่</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {monkAssignments.map(c => (
-                            <TableRow key={c.id}>
-                              <TableCell className="text-xs">
-                                {(() => { try { return format(parseISO(c.date), 'd MMM', { locale: th }); } catch { return c.date; } })()}
-                              </TableCell>
-                              <TableCell className="text-xs">{c.time || '-'}</TableCell>
-                              <TableCell className="text-xs">
-                                <Badge variant={c.type === 'มงคล' ? 'success' : 'secondary'} className="text-xs">
-                                  {c.type}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-xs truncate max-w-[100px]">{c.location || c.ceremonyLocation || '-'}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                {/* 1. Welcome Card */}
+                <Card className="shadow-card border-secondary/40 bg-gradient-to-br from-card to-secondary/5">
+                  <CardContent className="pt-5 pb-4">
+                    <div className="flex items-start gap-4">
+                      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-secondary/20 ring-2 ring-secondary/30 shrink-0">
+                        <span className="text-2xl">🙏</span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-base font-bold text-foreground leading-tight">
+                          ยินดีต้อนรับ, {loggedInMonk.name}
+                        </p>
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          <Badge variant="maha" className="text-xs">{loggedInMonk.rank}</Badge>
+                          <Badge variant="outline" className="text-xs">พรรษา {loggedInMonk.yearsOrdained}</Badge>
+                          <Badge variant="outline" className="text-xs">{loggedInMonk.building}</Badge>
+                          {loggedInMonk.canLead && <Badge variant="gold" className="text-xs">หัวนำสวดได้</Badge>}
+                        </div>
+                      </div>
                     </div>
-                  )}
+                  </CardContent>
+                </Card>
+
+                {/* 2. Stats Cards */}
+                <div className="grid grid-cols-2 gap-3">
+                  <Card className="shadow-card">
+                    <CardContent className="pt-4 pb-3 text-center">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 mx-auto mb-2">
+                        <Users className="h-5 w-5 text-primary" />
+                      </div>
+                      <p className="text-xs text-muted-foreground mb-1">สถานะคิวปัจจุบัน</p>
+                      <p className="text-2xl font-bold text-primary">{loggedInMonk.queueScore}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {loggedInMonk.isFrozen ? '⏸️ ถูกระงับคิวชั่วคราว' : `ลำดับที่ ${loggedInMonk.queueScore} พร้อมรับงาน`}
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card className="shadow-card">
+                    <CardContent className="pt-4 pb-3 text-center">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success/10 mx-auto mb-2">
+                        <BarChart3 className="h-5 w-5 text-success" />
+                      </div>
+                      <p className="text-xs text-muted-foreground mb-1">กิจนิมนต์เดือนนี้</p>
+                      <p className="text-2xl font-bold text-success">{myMonthCount}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">ออกงานแล้ว {myMonthCount} ครั้ง</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Overall progress */}
+                <Card className="shadow-card">
+                  <CardContent className="pt-4 pb-3">
+                    <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
+                      <span>สถิติออกงานสะสม</span>
+                      <span className="font-semibold">{loggedInMonk.totalAssignments} / 20 งาน (เป้าปี)</span>
+                    </div>
+                    <Progress value={Math.min((loggedInMonk.totalAssignments / 20) * 100, 100)} className="h-2.5" />
+                  </CardContent>
+                </Card>
+
+                {/* 3. Upcoming Event Card */}
+                <Card className={cn("shadow-card border-l-4", nextEvent ? "border-l-secondary" : "border-l-muted")}>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <CalendarIcon className="h-4 w-4 text-secondary" />
+                      งานกิจนิมนต์ที่กำลังจะถึง
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {nextEvent ? (
+                      <div className="space-y-3">
+                        <div className="rounded-lg bg-secondary/5 border border-secondary/20 p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="font-semibold text-foreground text-sm">
+                                {nextEvent.description || `${nextEvent.type} — ${nextEvent.monkCount} รูป`}
+                              </p>
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <CalendarIcon className="h-3 w-3" />
+                                  {(() => { try { return format(parseISO(nextEvent.date), 'PPP', { locale: th }); } catch { return nextEvent.date; } })()}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  {nextEvent.time || 'ยังไม่ระบุเวลา'}
+                                </span>
+                              </div>
+                              {(nextEvent.location || nextEvent.ceremonyLocation) && (
+                                <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                                  <MapPin className="h-3 w-3" />
+                                  {nextEvent.location || nextEvent.ceremonyLocation}
+                                </p>
+                              )}
+                            </div>
+                            <Badge variant={nextEvent.type === 'มงคล' ? 'success' : 'secondary'} className="shrink-0">
+                              {nextEvent.type}
+                            </Badge>
+                          </div>
+                          {myRole && (
+                            <div className="mt-3 pt-2 border-t border-secondary/20">
+                              <Badge variant={myRole.role === 'หัวนำสวด' ? 'gold' : 'outline'} className="text-xs">
+                                หน้าที่: {myRole.role}
+                              </Badge>
+                            </div>
+                          )}
+                        </div>
+
+                        {upcomingAssignments.length > 1 && (
+                          <div className="space-y-1.5">
+                            <p className="text-xs font-semibold text-muted-foreground">งานถัดไป:</p>
+                            {upcomingAssignments.slice(1).map(c => (
+                              <div key={c.id} className="flex items-center justify-between rounded-md bg-muted/50 px-3 py-2">
+                                <span className="text-xs text-foreground">
+                                  {(() => { try { return format(parseISO(c.date), 'd MMM', { locale: th }); } catch { return c.date; } })()}
+                                  {' · '}{c.description || c.type}
+                                </span>
+                                <Badge variant={c.type === 'มงคล' ? 'success' : 'secondary'} className="text-[10px]">{c.type}</Badge>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center py-6">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted mx-auto mb-3">
+                          <CalendarIcon className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                        <p className="text-sm text-muted-foreground">ยังไม่มีกิจนิมนต์ในขณะนี้</p>
+                        <p className="text-xs text-muted-foreground mt-1">ท่านจะได้รับแจ้งเตือนเมื่อมีงานมอบหมายใหม่</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* 4. Action Buttons */}
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Shortcut: จัดการบทสวด → หน้าโปรไฟล์ */}
+                  <Button
+                    variant="outline"
+                    className="h-auto py-4 flex-col gap-2 bg-card hover:bg-secondary/5 border-secondary/30"
+                    onClick={() => navigate('/monk')}
+                  >
+                    <BookOpen className="h-5 w-5 text-secondary" />
+                    <span className="text-xs font-semibold">📿 จัดการบทสวด</span>
+                    <span className="text-[10px] text-muted-foreground">หน้าโปรไฟล์</span>
+                  </Button>
+                  {/* Shortcut: จัดการคิวตึก — สำหรับหัวหน้าตึกเท่านั้น */}
+                  <Button
+                    variant="outline"
+                    className="h-auto py-4 flex-col gap-2 bg-card hover:bg-primary/5 border-primary/30"
+                    onClick={() => navigate('/building-head')}
+                  >
+                    <Shield className="h-5 w-5 text-primary" />
+                    <span className="text-xs font-semibold">🏛️ จัดการคิวตึก</span>
+                    <span className="text-[10px] text-muted-foreground">สำหรับหัวหน้าตึก</span>
+                  </Button>
                 </div>
               </div>
-            )}
-          </DialogContent>
-        </Dialog>
+            );
+          })()}
+        </section>
 
         <Separator />
 
