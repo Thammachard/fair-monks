@@ -428,7 +428,7 @@ export default function LayPersonPage() {
         <Card className="bg-muted/50 border-gold-subtle">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2 text-accent">
-              📋 แนะนำเรื่องเวลาและสิ่งที่ต้องเตรียม ({ceremonyType === 'มงคล' ? 'งานมงคล' : 'งานอวมงคล'})
+              📋 คำแนะนำและสิ่งที่ต้องเตรียม ({ceremonyType})
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
