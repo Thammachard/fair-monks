@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Ceremony, Monk } from '@/lib/types';
 import { loadCeremonies, loadMonks } from '@/lib/storage';
 import { Badge } from '@/components/ui/badge';
@@ -37,7 +37,10 @@ export default function HomePage() {
   const navigate = useNavigate();
   const [ceremonies, setCeremonies] = useState<Ceremony[]>([]);
   const [monks, setMonks] = useState<Monk[]>([]);
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  // Default to current date: March 2026
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date(2026, 2, 13));
+  // Simulate user type — in production this comes from auth
+  const [isMonkUser, setIsMonkUser] = useState(false);
 
   const laypeopleRef = useRef<HTMLElement>(null);
   const monkRef = useRef<HTMLElement>(null);
@@ -64,9 +67,6 @@ export default function HomePage() {
     } catch { return false; }
   });
 
-
-
-
   const getTypeStyle = (type: string, location?: string) => {
     if (type === 'อวมงคล') return { bg: 'bg-muted', text: 'text-muted-foreground', dot: '⬜' };
     if (location === 'ในวัด') return { bg: 'bg-secondary/10', text: 'text-secondary-foreground', dot: '🟡' };
@@ -77,6 +77,176 @@ export default function HomePage() {
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
+  // Monk dashboard renderer
+  const renderMonkDashboard = () => {
+    const loggedInMonk = monks[0];
+    if (!loggedInMonk) return <p className="text-sm text-muted-foreground">กำลังโหลดข้อมูล...</p>;
+
+    const myAssignments = confirmedCeremonies.filter(c =>
+      c.assignments?.some(a => a.monk.id === loggedInMonk.id)
+    );
+    const now = new Date();
+    const myMonthCount = myAssignments.filter(c => {
+      try {
+        const d = parseISO(c.date);
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      } catch { return false; }
+    }).length;
+    const upcomingAssignments = myAssignments
+      .filter(c => { try { return parseISO(c.date) >= now; } catch { return false; } })
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(0, 3);
+    const nextEvent = upcomingAssignments[0];
+    const myRole = nextEvent?.assignments?.find(a => a.monk.id === loggedInMonk.id);
+
+    return (
+      <div className="space-y-4">
+        {/* 1. Welcome Card */}
+        <Card className="shadow-card border-secondary/40 bg-gradient-to-br from-card to-secondary/5">
+          <CardContent className="pt-5 pb-4">
+            <div className="flex items-start gap-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-secondary/20 ring-2 ring-secondary/30 shrink-0">
+                <span className="text-2xl">🙏</span>
+              </div>
+              <div className="min-w-0">
+                <p className="text-base font-bold text-foreground leading-tight">
+                  ยินดีต้อนรับ, {loggedInMonk.name}
+                </p>
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  <Badge variant="maha" className="text-xs">{loggedInMonk.rank}</Badge>
+                  <Badge variant="outline" className="text-xs">พรรษา {loggedInMonk.yearsOrdained}</Badge>
+                  <Badge variant="outline" className="text-xs">{loggedInMonk.building}</Badge>
+                  {loggedInMonk.canLead && <Badge variant="gold" className="text-xs">หัวนำสวดได้</Badge>}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 2. Stats Cards */}
+        <div className="grid grid-cols-2 gap-3">
+          <Card className="shadow-card">
+            <CardContent className="pt-4 pb-3 text-center">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 mx-auto mb-2">
+                <Users className="h-5 w-5 text-primary" />
+              </div>
+              <p className="text-xs text-muted-foreground mb-1">สถานะคิวปัจจุบัน</p>
+              <p className="text-2xl font-bold text-primary">{loggedInMonk.queueScore}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {loggedInMonk.isFrozen ? '⏸️ ถูกระงับคิวชั่วคราว' : `ลำดับที่ ${loggedInMonk.queueScore} พร้อมรับงาน`}
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="shadow-card">
+            <CardContent className="pt-4 pb-3 text-center">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success/10 mx-auto mb-2">
+                <BarChart3 className="h-5 w-5 text-success" />
+              </div>
+              <p className="text-xs text-muted-foreground mb-1">กิจนิมนต์เดือนนี้</p>
+              <p className="text-2xl font-bold text-success">{myMonthCount}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">ออกงานแล้ว {myMonthCount} ครั้ง</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Overall progress */}
+        <Card className="shadow-card">
+          <CardContent className="pt-4 pb-3">
+            <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
+              <span>สถิติออกงานสะสม</span>
+              <span className="font-semibold">{loggedInMonk.totalAssignments} / 20 งาน (เป้าปี)</span>
+            </div>
+            <Progress value={Math.min((loggedInMonk.totalAssignments / 20) * 100, 100)} className="h-2.5" />
+          </CardContent>
+        </Card>
+
+        {/* 3. Upcoming Event Card */}
+        <Card className={cn("shadow-card border-l-4", nextEvent ? "border-l-secondary" : "border-l-muted")}>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <CalendarIcon className="h-4 w-4 text-secondary" />
+              งานกิจนิมนต์ที่กำลังจะถึง
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {nextEvent ? (
+              <div className="space-y-3">
+                <div className="rounded-lg bg-secondary/5 border border-secondary/20 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-foreground text-sm">
+                        {nextEvent.description || `${nextEvent.type} — ${nextEvent.monkCount} รูป`}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <CalendarIcon className="h-3 w-3" />
+                          {(() => { try { return format(parseISO(nextEvent.date), 'PPP', { locale: th }); } catch { return nextEvent.date; } })()}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {nextEvent.time || 'ยังไม่ระบุเวลา'}
+                        </span>
+                      </div>
+                      {(nextEvent.location || nextEvent.ceremonyLocation) && (
+                        <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                          <MapPin className="h-3 w-3" />
+                          {nextEvent.location || nextEvent.ceremonyLocation}
+                        </p>
+                      )}
+                    </div>
+                    <Badge variant={nextEvent.type === 'มงคล' ? 'success' : 'secondary'} className="shrink-0">
+                      {nextEvent.type}
+                    </Badge>
+                  </div>
+                  {myRole && (
+                    <div className="mt-3 pt-2 border-t border-secondary/20">
+                      <Badge variant={myRole.role === 'หัวนำสวด' ? 'gold' : 'outline'} className="text-xs">
+                        หน้าที่: {myRole.role}
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+
+                {upcomingAssignments.length > 1 && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-semibold text-muted-foreground">งานถัดไป:</p>
+                    {upcomingAssignments.slice(1).map(c => (
+                      <div key={c.id} className="flex items-center justify-between rounded-md bg-muted/50 px-3 py-2">
+                        <span className="text-xs text-foreground">
+                          {(() => { try { return format(parseISO(c.date), 'd MMM', { locale: th }); } catch { return c.date; } })()}
+                          {' · '}{c.description || c.type}
+                        </span>
+                        <Badge variant={c.type === 'มงคล' ? 'success' : 'secondary'} className="text-[10px]">{c.type}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-6">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted mx-auto mb-3">
+                  <CalendarIcon className="h-6 w-6 text-muted-foreground" />
+                </div>
+                <p className="text-sm text-muted-foreground">ยังไม่มีกิจนิมนต์ในขณะนี้</p>
+                <p className="text-xs text-muted-foreground mt-1">ท่านจะได้รับแจ้งเตือนเมื่อมีงานมอบหมายใหม่</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* 4. Action Button — only จัดการบทสวด */}
+        <Button
+          variant="outline"
+          className="w-full h-auto py-4 flex-col gap-2 bg-card hover:bg-secondary/5 border-secondary/30"
+          onClick={() => navigate('/monk')}
+        >
+          <BookOpen className="h-5 w-5 text-secondary" />
+          <span className="text-xs font-semibold">📿 จัดการบทสวด (หน้าโปรไฟล์)</span>
+        </Button>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-background">
 
@@ -84,13 +254,11 @@ export default function HomePage() {
       {/* SECTION 1: HERO                                           */}
       {/* ═══════════════════════════════════════════════════════════ */}
       <header className="relative overflow-hidden">
-        {/* Gradient background */}
         <div className="absolute inset-0 gradient-maroon" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,hsl(43_74%_49%/0.15),transparent_60%)]" />
         <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-background to-transparent" />
 
         <div className="relative z-10 container mx-auto max-w-4xl px-4 pt-10 pb-16 text-center">
-          {/* Temple icon */}
           <div className="flex justify-center mb-4">
             <div className="flex h-20 w-20 items-center justify-center rounded-full bg-secondary/90 shadow-gold ring-4 ring-secondary/30">
               <span className="text-4xl">🛕</span>
@@ -104,8 +272,29 @@ export default function HomePage() {
             Temple Monk Invitation &amp; Scheduling Portal
           </p>
 
+          {/* User type toggle for demo */}
+          <div className="flex items-center justify-center gap-2 mt-4">
+            <span className="text-xs text-primary-foreground/60">สลับมุมมอง:</span>
+            <Button
+              variant={!isMonkUser ? 'gold' : 'outline'}
+              size="sm"
+              className={cn("text-xs", !isMonkUser ? '' : 'bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20')}
+              onClick={() => setIsMonkUser(false)}
+            >
+              👤 โยม
+            </Button>
+            <Button
+              variant={isMonkUser ? 'gold' : 'outline'}
+              size="sm"
+              className={cn("text-xs", isMonkUser ? '' : 'bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20')}
+              onClick={() => setIsMonkUser(true)}
+            >
+              🪷 พระ/เณร
+            </Button>
+          </div>
+
           {/* Dual CTA */}
-          <div className="flex flex-col sm:flex-row gap-3 justify-center mt-8">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center mt-6">
             <Button
               variant="gold"
               size="lg"
@@ -115,15 +304,17 @@ export default function HomePage() {
               🙏 ขอนิมนต์พระ
               <ChevronDown className="h-4 w-4" />
             </Button>
-            <Button
-              variant="outline"
-              size="lg"
-              className="gap-2 text-base px-8 bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 hover:text-primary-foreground"
-              onClick={() => scrollTo(monkRef)}
-            >
-              🪷 เข้าสู่ระบบพระภิกษุ
-              <ChevronDown className="h-4 w-4" />
-            </Button>
+            {isMonkUser && (
+              <Button
+                variant="outline"
+                size="lg"
+                className="gap-2 text-base px-8 bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                onClick={() => scrollTo(monkRef)}
+              >
+                🪷 ดูแดชบอร์ดส่วนตัว
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         </div>
       </header>
@@ -149,7 +340,26 @@ export default function HomePage() {
       <main className="container mx-auto max-w-4xl px-4 py-6 space-y-10">
 
         {/* ═══════════════════════════════════════════════════════════ */}
-        {/* SECTION 2: PUBLIC CALENDAR                                */}
+        {/* MONK DASHBOARD — shown FIRST, only for monk/novice users  */}
+        {/* ═══════════════════════════════════════════════════════════ */}
+        {isMonkUser && (
+          <>
+            <section ref={monkRef}>
+              <div className="flex items-center gap-2 mb-1">
+                <Shield className="h-5 w-5 text-secondary" />
+                <h2 className="text-lg font-bold text-foreground">แดชบอร์ดส่วนตัวคณะสงฆ์</h2>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">
+                ข้อมูลกิจนิมนต์และสถิติส่วนตัวของท่าน
+              </p>
+              {renderMonkDashboard()}
+            </section>
+            <Separator />
+          </>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════ */}
+        {/* PUBLIC CALENDAR — Full width, larger fonts                 */}
         {/* ═══════════════════════════════════════════════════════════ */}
         <section>
           <div className="flex items-center gap-2 mb-1">
@@ -173,33 +383,37 @@ export default function HomePage() {
                 <span className="flex items-center gap-1">🔴 วันพระ/วันสำคัญ</span>
               </div>
             </CardHeader>
-            <CardContent>
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={(d) => d && setSelectedDate(d)}
-                className={cn("p-3 pointer-events-auto mx-auto")}
-                modifiers={{ ceremony: ceremonyDates }}
-                modifiersStyles={{
-                  ceremony: {
-                    fontWeight: 'bold',
-                    textDecoration: 'underline',
-                    textDecorationColor: 'hsl(43, 74%, 49%)',
-                  },
-                }}
-              />
+            <CardContent className="px-0 sm:px-6">
+              {/* Full-width calendar with larger day cells */}
+              <div className="w-full [&_.rdp]:w-full [&_.rdp-months]:w-full [&_.rdp-month]:w-full [&_.rdp-table]:w-full [&_.rdp-head_cell]:text-sm [&_.rdp-head_cell]:w-auto [&_.rdp-head_cell]:flex-1 [&_.rdp-cell]:w-auto [&_.rdp-cell]:flex-1 [&_.rdp-cell]:h-12 [&_.rdp-day]:w-full [&_.rdp-day]:h-12 [&_.rdp-day]:text-base [&_.rdp-head_row]:flex [&_.rdp-row]:flex [&_.rdp-caption]:text-lg">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(d) => d && setSelectedDate(d)}
+                  defaultMonth={new Date(2026, 2)}
+                  className="p-3 pointer-events-auto w-full"
+                  modifiers={{ ceremony: ceremonyDates }}
+                  modifiersStyles={{
+                    ceremony: {
+                      fontWeight: 'bold',
+                      textDecoration: 'underline',
+                      textDecorationColor: 'hsl(43, 74%, 49%)',
+                    },
+                  }}
+                />
+              </div>
 
-              {/* Events on selected date */}
-              <div className="mt-4 space-y-2">
-                <p className="text-sm font-semibold">
-                  📅 {format(selectedDate, 'PPP', { locale: th })}
+              {/* Events on selected date — larger text */}
+              <div className="mt-6 px-4 sm:px-0 space-y-3">
+                <p className="text-base font-bold">
+                  📅 {format(selectedDate, 'PPPPp', { locale: th }).split(' เวลา')[0]}
                 </p>
 
                 {SPECIAL_DATES.filter(s => {
                   try { return isSameDay(parseISO(s.date), selectedDate); } catch { return false; }
                 }).map((s, i) => (
-                  <div key={i} className="rounded-lg p-3 bg-destructive/10 border border-destructive/20">
-                    <p className="text-sm font-semibold text-destructive">🔴 {s.label}</p>
+                  <div key={i} className="rounded-lg p-4 bg-destructive/10 border border-destructive/20">
+                    <p className="text-base font-semibold text-destructive">🔴 {s.label}</p>
                   </div>
                 ))}
 
@@ -210,19 +424,19 @@ export default function HomePage() {
                 {ceremoniesOnDate.map(c => {
                   const style = getTypeStyle(c.type, c.ceremonyLocation);
                   return (
-                    <div key={c.id} className={`rounded-lg p-3 ${style.bg} border`}>
+                    <div key={c.id} className={`rounded-lg p-4 ${style.bg} border`}>
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className={`font-semibold text-sm ${style.text}`}>
+                          <p className={`font-semibold text-base ${style.text}`}>
                             {style.dot} {c.type} — {c.monkCount} รูป
                             {c.ceremonyLocation && ` (${c.ceremonyLocation})`}
                           </p>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-sm text-muted-foreground mt-1">
                             {c.time || '-'} · {c.requesterName} · {c.description}
                           </p>
                           {c.location && (
-                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                              <MapPin className="h-3 w-3" /> {c.location}
+                            <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                              <MapPin className="h-4 w-4" /> {c.location}
                             </p>
                           )}
                         </div>
@@ -236,11 +450,11 @@ export default function HomePage() {
               </div>
 
               {specialDatesThisMonth.length > 0 && (
-                <div className="mt-4 pt-3 border-t">
-                  <p className="text-xs font-semibold mb-2">📌 วันสำคัญในเดือนนี้:</p>
-                  <div className="space-y-1">
+                <div className="mt-6 pt-4 border-t mx-4 sm:mx-0">
+                  <p className="text-sm font-semibold mb-2">📌 วันสำคัญในเดือนนี้:</p>
+                  <div className="space-y-1.5">
                     {specialDatesThisMonth.map((s, i) => (
-                      <p key={i} className="text-xs text-muted-foreground">
+                      <p key={i} className="text-sm text-muted-foreground">
                         • {(() => { try { return format(parseISO(s.date), 'd MMM', { locale: th }); } catch { return s.date; } })()} — {s.label}
                       </p>
                     ))}
@@ -265,7 +479,7 @@ export default function HomePage() {
         <Separator />
 
         {/* ═══════════════════════════════════════════════════════════ */}
-        {/* SECTION 3: LAYPEOPLE                                     */}
+        {/* LAYPEOPLE SECTION                                         */}
         {/* ═══════════════════════════════════════════════════════════ */}
         <section ref={laypeopleRef}>
           <div className="flex items-center gap-2 mb-1">
@@ -276,7 +490,6 @@ export default function HomePage() {
             กรอกแบบฟอร์มเพื่อขอนิมนต์พระ พร้อมศึกษาคู่มือเตรียมงานบุญ
           </p>
 
-          {/* Primary CTA */}
           <Button
             variant="gold"
             size="lg"
@@ -288,9 +501,7 @@ export default function HomePage() {
             <ChevronRight className="h-4 w-4" />
           </Button>
 
-          {/* Guide cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Auspicious guide */}
             <Card className="shadow-card border-success/30 hover:shadow-lg transition-shadow">
               <CardHeader className="pb-2">
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-success/10 mb-2">
@@ -319,7 +530,6 @@ export default function HomePage() {
               </CardContent>
             </Card>
 
-            {/* Inauspicious guide */}
             <Card className="shadow-card border-muted hover:shadow-lg transition-shadow">
               <CardHeader className="pb-2">
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted mb-2">
@@ -353,206 +563,7 @@ export default function HomePage() {
         <Separator />
 
         {/* ═══════════════════════════════════════════════════════════ */}
-        {/* SECTION 4: PERSONALIZED MONK DASHBOARD (No login required) */}
-        {/* ═══════════════════════════════════════════════════════════ */}
-        <section ref={monkRef}>
-          <div className="flex items-center gap-2 mb-1">
-            <Shield className="h-5 w-5 text-secondary" />
-            <h2 className="text-lg font-bold text-foreground">แดชบอร์ดส่วนตัวคณะสงฆ์</h2>
-          </div>
-          <p className="text-sm text-muted-foreground mb-4">
-            ข้อมูลกิจนิมนต์และสถิติส่วนตัวของท่าน
-          </p>
-
-          {(() => {
-            // Simulate logged-in monk (first monk in list)
-            const loggedInMonk = monks[0];
-            if (!loggedInMonk) return <p className="text-sm text-muted-foreground">กำลังโหลดข้อมูล...</p>;
-
-            const myAssignments = confirmedCeremonies.filter(c =>
-              c.assignments?.some(a => a.monk.id === loggedInMonk.id)
-            );
-            const now = new Date();
-            const myMonthCount = myAssignments.filter(c => {
-              try {
-                const d = parseISO(c.date);
-                return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-              } catch { return false; }
-            }).length;
-            const upcomingAssignments = myAssignments
-              .filter(c => { try { return parseISO(c.date) >= now; } catch { return false; } })
-              .sort((a, b) => a.date.localeCompare(b.date))
-              .slice(0, 3);
-            const nextEvent = upcomingAssignments[0];
-            const myRole = nextEvent?.assignments?.find(a => a.monk.id === loggedInMonk.id);
-
-            return (
-              <div className="space-y-4">
-                {/* 1. Welcome Card */}
-                <Card className="shadow-card border-secondary/40 bg-gradient-to-br from-card to-secondary/5">
-                  <CardContent className="pt-5 pb-4">
-                    <div className="flex items-start gap-4">
-                      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-secondary/20 ring-2 ring-secondary/30 shrink-0">
-                        <span className="text-2xl">🙏</span>
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-base font-bold text-foreground leading-tight">
-                          ยินดีต้อนรับ, {loggedInMonk.name}
-                        </p>
-                        <div className="flex flex-wrap gap-1.5 mt-2">
-                          <Badge variant="maha" className="text-xs">{loggedInMonk.rank}</Badge>
-                          <Badge variant="outline" className="text-xs">พรรษา {loggedInMonk.yearsOrdained}</Badge>
-                          <Badge variant="outline" className="text-xs">{loggedInMonk.building}</Badge>
-                          {loggedInMonk.canLead && <Badge variant="gold" className="text-xs">หัวนำสวดได้</Badge>}
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* 2. Stats Cards */}
-                <div className="grid grid-cols-2 gap-3">
-                  <Card className="shadow-card">
-                    <CardContent className="pt-4 pb-3 text-center">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 mx-auto mb-2">
-                        <Users className="h-5 w-5 text-primary" />
-                      </div>
-                      <p className="text-xs text-muted-foreground mb-1">สถานะคิวปัจจุบัน</p>
-                      <p className="text-2xl font-bold text-primary">{loggedInMonk.queueScore}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {loggedInMonk.isFrozen ? '⏸️ ถูกระงับคิวชั่วคราว' : `ลำดับที่ ${loggedInMonk.queueScore} พร้อมรับงาน`}
-                      </p>
-                    </CardContent>
-                  </Card>
-                  <Card className="shadow-card">
-                    <CardContent className="pt-4 pb-3 text-center">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success/10 mx-auto mb-2">
-                        <BarChart3 className="h-5 w-5 text-success" />
-                      </div>
-                      <p className="text-xs text-muted-foreground mb-1">กิจนิมนต์เดือนนี้</p>
-                      <p className="text-2xl font-bold text-success">{myMonthCount}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">ออกงานแล้ว {myMonthCount} ครั้ง</p>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Overall progress */}
-                <Card className="shadow-card">
-                  <CardContent className="pt-4 pb-3">
-                    <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
-                      <span>สถิติออกงานสะสม</span>
-                      <span className="font-semibold">{loggedInMonk.totalAssignments} / 20 งาน (เป้าปี)</span>
-                    </div>
-                    <Progress value={Math.min((loggedInMonk.totalAssignments / 20) * 100, 100)} className="h-2.5" />
-                  </CardContent>
-                </Card>
-
-                {/* 3. Upcoming Event Card */}
-                <Card className={cn("shadow-card border-l-4", nextEvent ? "border-l-secondary" : "border-l-muted")}>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm flex items-center gap-2">
-                      <CalendarIcon className="h-4 w-4 text-secondary" />
-                      งานกิจนิมนต์ที่กำลังจะถึง
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {nextEvent ? (
-                      <div className="space-y-3">
-                        <div className="rounded-lg bg-secondary/5 border border-secondary/20 p-4">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="font-semibold text-foreground text-sm">
-                                {nextEvent.description || `${nextEvent.type} — ${nextEvent.monkCount} รูป`}
-                              </p>
-                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs text-muted-foreground">
-                                <span className="flex items-center gap-1">
-                                  <CalendarIcon className="h-3 w-3" />
-                                  {(() => { try { return format(parseISO(nextEvent.date), 'PPP', { locale: th }); } catch { return nextEvent.date; } })()}
-                                </span>
-                                <span className="flex items-center gap-1">
-                                  <Clock className="h-3 w-3" />
-                                  {nextEvent.time || 'ยังไม่ระบุเวลา'}
-                                </span>
-                              </div>
-                              {(nextEvent.location || nextEvent.ceremonyLocation) && (
-                                <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-                                  <MapPin className="h-3 w-3" />
-                                  {nextEvent.location || nextEvent.ceremonyLocation}
-                                </p>
-                              )}
-                            </div>
-                            <Badge variant={nextEvent.type === 'มงคล' ? 'success' : 'secondary'} className="shrink-0">
-                              {nextEvent.type}
-                            </Badge>
-                          </div>
-                          {myRole && (
-                            <div className="mt-3 pt-2 border-t border-secondary/20">
-                              <Badge variant={myRole.role === 'หัวนำสวด' ? 'gold' : 'outline'} className="text-xs">
-                                หน้าที่: {myRole.role}
-                              </Badge>
-                            </div>
-                          )}
-                        </div>
-
-                        {upcomingAssignments.length > 1 && (
-                          <div className="space-y-1.5">
-                            <p className="text-xs font-semibold text-muted-foreground">งานถัดไป:</p>
-                            {upcomingAssignments.slice(1).map(c => (
-                              <div key={c.id} className="flex items-center justify-between rounded-md bg-muted/50 px-3 py-2">
-                                <span className="text-xs text-foreground">
-                                  {(() => { try { return format(parseISO(c.date), 'd MMM', { locale: th }); } catch { return c.date; } })()}
-                                  {' · '}{c.description || c.type}
-                                </span>
-                                <Badge variant={c.type === 'มงคล' ? 'success' : 'secondary'} className="text-[10px]">{c.type}</Badge>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="text-center py-6">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted mx-auto mb-3">
-                          <CalendarIcon className="h-6 w-6 text-muted-foreground" />
-                        </div>
-                        <p className="text-sm text-muted-foreground">ยังไม่มีกิจนิมนต์ในขณะนี้</p>
-                        <p className="text-xs text-muted-foreground mt-1">ท่านจะได้รับแจ้งเตือนเมื่อมีงานมอบหมายใหม่</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* 4. Action Buttons */}
-                <div className="grid grid-cols-2 gap-3">
-                  {/* Shortcut: จัดการบทสวด → หน้าโปรไฟล์ */}
-                  <Button
-                    variant="outline"
-                    className="h-auto py-4 flex-col gap-2 bg-card hover:bg-secondary/5 border-secondary/30"
-                    onClick={() => navigate('/monk')}
-                  >
-                    <BookOpen className="h-5 w-5 text-secondary" />
-                    <span className="text-xs font-semibold">📿 จัดการบทสวด</span>
-                    <span className="text-[10px] text-muted-foreground">หน้าโปรไฟล์</span>
-                  </Button>
-                  {/* Shortcut: จัดการคิวตึก — สำหรับหัวหน้าตึกเท่านั้น */}
-                  <Button
-                    variant="outline"
-                    className="h-auto py-4 flex-col gap-2 bg-card hover:bg-primary/5 border-primary/30"
-                    onClick={() => navigate('/building-head')}
-                  >
-                    <Shield className="h-5 w-5 text-primary" />
-                    <span className="text-xs font-semibold">🏛️ จัดการคิวตึก</span>
-                    <span className="text-[10px] text-muted-foreground">สำหรับหัวหน้าตึก</span>
-                  </Button>
-                </div>
-              </div>
-            );
-          })()}
-        </section>
-
-        <Separator />
-
-        {/* ═══════════════════════════════════════════════════════════ */}
-        {/* SECTION 5: FOOTER                                        */}
+        {/* FOOTER                                                    */}
         {/* ═══════════════════════════════════════════════════════════ */}
         <footer className="rounded-xl bg-card border shadow-card p-6 space-y-4">
           <h2 className="text-base font-bold text-foreground flex items-center gap-2">
