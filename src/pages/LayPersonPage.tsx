@@ -379,12 +379,8 @@ export default function LayPersonPage() {
                   <Label htmlFor="meal-none" className="cursor-pointer font-normal">ไม่มี</Label>
                 </div>
                 <div className="flex items-center gap-2">
-                  <RadioGroupItem value="มื้อเช้า" id="meal-morning" />
-                  <Label htmlFor="meal-morning" className="cursor-pointer font-normal">🍳 มื้อเช้า</Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="มื้อเพล" id="meal-noon" />
-                  <Label htmlFor="meal-noon" className="cursor-pointer font-normal">🍱 มื้อเพล</Label>
+                  <RadioGroupItem value="ภัตตาหาร" id="meal-food" />
+                  <Label htmlFor="meal-food" className="cursor-pointer font-normal">🍱 ภัตตาหาร</Label>
                 </div>
               </RadioGroup>
             </div>
