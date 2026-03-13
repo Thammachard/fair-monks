@@ -37,7 +37,6 @@ export interface Monk {
   activityScore: number;
   leadCriteria?: LeadChanterCriteria;
   assignmentHistory?: AssignmentHistoryEntry[];
-  // New fields for self-service
   availability: MonkAvailability;
   unavailableReason?: string;
   acceptMode: MonkAcceptMode;
@@ -63,7 +62,8 @@ export interface Assignment {
 
 export type TransportOption = 'เจ้าภาพรับ-ส่ง' | 'วัดเดินทางเอง';
 export type MealOption = 'ไม่มี' | 'ภัตตาหาร';
-export type DiningStyle = 'ฉันวง' | 'ฉันโตก';
+export type DiningStyle = 'ฉันวง' | 'ฉันโตก' | 'เฉพาะรูป' | 'อื่นๆ';
+export type TemplePreparationMode = 'เจ้าภาพเตรียมเอง' | 'ทำผาติกรรม';
 
 export interface CeremonyRequest {
   id: string;
@@ -83,12 +83,16 @@ export interface CeremonyRequest {
   pickupTime?: string;
   mealOption: MealOption;
   diningStyle?: DiningStyle;
+  diningOtherDetails?: string;
   additionalDetails?: string;
   description: string;
   needTemplePreparation: boolean;
+  templePreparationMode?: TemplePreparationMode;
   templePreparationDetails?: string;
+  templePreparationItems?: string[];
   selectedChantIds?: string[];
   specifiedMonkIds?: string[];
+  hasAlmsBowlCeremony?: boolean;
   status: 'waiting' | 'approved' | 'rejected';
   createdAt: string;
   suggestedItems?: string;
@@ -118,12 +122,18 @@ export interface Ceremony {
   suggestedItems?: string;
   suggestedTime?: string;
   needTemplePreparation?: boolean;
+  templePreparationMode?: TemplePreparationMode;
   templePreparationDetails?: string;
   templePreparationItems?: string[];
   requestId?: string;
   isOpenForAll?: boolean;
   checkInResults?: CheckInEntry[];
   phoneNumber?: string;
+  hasAlmsBowlCeremony?: boolean;
+  mealOption?: MealOption;
+  diningStyle?: DiningStyle;
+  diningOtherDetails?: string;
+  ceremonyTitle?: string;
 }
 
 // Quota configs for different ceremony sizes
