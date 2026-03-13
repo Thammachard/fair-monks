@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react';
 import { Ceremony } from '@/lib/types';
 import { loadCeremonies } from '@/lib/storage';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ChevronDown, ChevronUp, CheckCircle, XCircle, RefreshCw, Snowflake, Clock, Filter } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronUp, CheckCircle, XCircle, RefreshCw, Clock, Filter } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const rankBadgeVariant = (rank: string) => {
@@ -18,10 +18,11 @@ const rankBadgeVariant = (rank: string) => {
   }
 };
 
-const statusConfig = {
-  confirmed: { label: 'ยืนยันแล้ว', variant: 'success' as const, icon: CheckCircle },
-  pending: { label: 'รออนุมัติ', variant: 'warning' as const, icon: Clock },
-  draft: { label: 'ร่าง', variant: 'outline' as const, icon: Clock },
+const statusConfig: Record<string, { label: string; variant: 'success' | 'warning' | 'outline' | 'default'; icon: typeof CheckCircle }> = {
+  completed: { label: '✅ จบงาน', variant: 'default', icon: CheckCircle },
+  confirmed: { label: 'ยืนยันแล้ว', variant: 'success', icon: CheckCircle },
+  pending: { label: 'รออนุมัติ', variant: 'warning', icon: Clock },
+  draft: { label: 'ร่าง', variant: 'outline', icon: Clock },
 };
 
 export default function HistoryPage() {
@@ -43,9 +44,8 @@ export default function HistoryPage() {
   const stats = {
     total: ceremonies.length,
     confirmed: ceremonies.filter(c => c.status === 'confirmed').length,
+    completed: ceremonies.filter(c => c.status === 'completed').length,
     pending: ceremonies.filter(c => c.status === 'pending').length,
-    mangkol: ceremonies.filter(c => c.type === 'มงคล').length,
-    awamangkol: ceremonies.filter(c => c.type === 'อวมงคล').length,
   };
 
   return (
@@ -53,12 +53,12 @@ export default function HistoryPage() {
       <header className="gradient-maroon px-4 py-6 shadow-lg">
         <div className="container mx-auto max-w-4xl">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/20">
               <span className="text-xl">📜</span>
             </div>
             <div>
-              <h1 className="text-xl font-bold text-cream">ประวัติงานย้อนหลัง</h1>
-              <p className="text-sm text-cream/70">ตรวจสอบรายละเอียดงานที่ผ่านมา</p>
+              <h1 className="text-xl font-bold text-primary-foreground">ประวัติงานย้อนหลัง</h1>
+              <p className="text-sm text-primary-foreground/70">ตรวจสอบรายละเอียดงานที่ผ่านมา</p>
             </div>
           </div>
         </div>
@@ -79,8 +79,8 @@ export default function HistoryPage() {
           </Card>
           <Card className="shadow-card text-center">
             <CardContent className="py-3">
-              <p className="text-2xl font-bold text-success">{stats.confirmed}</p>
-              <p className="text-xs text-muted-foreground">ยืนยันแล้ว</p>
+              <p className="text-2xl font-bold text-success">{stats.completed}</p>
+              <p className="text-xs text-muted-foreground">จบงานแล้ว</p>
             </CardContent>
           </Card>
           <Card className="shadow-card text-center">
@@ -100,6 +100,7 @@ export default function HistoryPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">ทุกสถานะ</SelectItem>
+              <SelectItem value="completed">จบงานแล้ว</SelectItem>
               <SelectItem value="confirmed">ยืนยันแล้ว</SelectItem>
               <SelectItem value="pending">รออนุมัติ</SelectItem>
               <SelectItem value="draft">ร่าง</SelectItem>
@@ -147,7 +148,7 @@ export default function HistoryPage() {
                   >
                     <div className="flex items-center gap-3">
                       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-lg">
-                        {c.type === 'มงคล' ? '🟢' : '🔴'}
+                        {c.type === 'มงคล' ? '🟢' : c.type === 'อวมงคล' ? '🔴' : '🟡'}
                       </div>
                       <div>
                         <p className="font-semibold">{c.type} — {c.monkCount} รูป</p>
@@ -179,8 +180,8 @@ export default function HistoryPage() {
                           key={a.monk.id}
                           className={`flex items-center justify-between rounded-lg border p-3 text-sm ${
                             a.status === 'approved' ? 'bg-success/5 border-success/30' :
-                            a.status === 'rejected_sick' ? 'bg-warning/5 border-warning/30' :
-                            a.status === 'rejected_skip' ? 'bg-destructive/5 border-destructive/30' :
+                            a.status === 'rejected' ? 'bg-destructive/5 border-destructive/30' :
+                            a.status === 'substituted' ? 'bg-warning/5 border-warning/30' :
                             'bg-background'
                           }`}
                         >
@@ -193,6 +194,9 @@ export default function HistoryPage() {
                               <p className="text-xs text-muted-foreground">
                                 {a.monk.building} · พรรษา {a.monk.yearsOrdained}
                               </p>
+                              {a.rejectReason && (
+                                <p className="text-xs text-destructive mt-0.5">เหตุผล: {a.rejectReason}</p>
+                              )}
                             </div>
                           </div>
                           <div className="flex items-center gap-2 flex-wrap justify-end">
@@ -202,21 +206,21 @@ export default function HistoryPage() {
                             {a.role === 'หัวนำสวด' && <Badge variant="gold" className="text-xs">🎵</Badge>}
                             {a.status === 'approved' && (
                               <Badge variant="success" className="text-xs gap-1">
-                                <CheckCircle className="h-3 w-3" /> อนุมัติ
+                                <CheckCircle className="h-3 w-3" /> รับงาน
                               </Badge>
                             )}
-                            {a.status === 'rejected_sick' && (
-                              <Badge variant="warning" className="text-xs gap-1">
-                                <Snowflake className="h-3 w-3" /> อาพาธ
-                              </Badge>
-                            )}
-                            {a.status === 'rejected_skip' && (
+                            {a.status === 'rejected' && (
                               <Badge variant="destructive" className="text-xs gap-1">
-                                <XCircle className="h-3 w-3" /> สละสิทธิ์
+                                <XCircle className="h-3 w-3" /> ปฏิเสธ
+                              </Badge>
+                            )}
+                            {a.status === 'substituted' && (
+                              <Badge variant="warning" className="text-xs gap-1">
+                                <RefreshCw className="h-3 w-3" /> เปลี่ยนตัว
                               </Badge>
                             )}
                             {a.status === 'pending' && (
-                              <Badge variant="outline" className="text-xs">รอ</Badge>
+                              <Badge variant="outline" className="text-xs">รอตอบรับ</Badge>
                             )}
                           </div>
                         </div>
@@ -228,7 +232,7 @@ export default function HistoryPage() {
                             .filter(a => a.substitute)
                             .map(a => (
                               <div key={`sub-${a.monk.id}`} className="flex items-center gap-2 rounded bg-muted p-2 text-sm">
-                                <RefreshCw className="h-4 w-4 text-accent" />
+                                <RefreshCw className="h-4 w-4 text-primary" />
                                 <span className="text-muted-foreground">{a.monk.name}</span>
                                 <span>→</span>
                                 <span className="font-medium">{a.substitute!.name}</span>
