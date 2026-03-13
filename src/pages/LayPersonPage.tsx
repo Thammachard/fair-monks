@@ -20,14 +20,16 @@ import { toast } from 'sonner';
 
 const MONK_COUNTS = [3, 4, 5, 7, 9, 10];
 
-const SUGGESTED_ITEMS: Record<CeremonyType, string> = {
-  'มงคล': '- น้ำมนต์ (ขัน/ถัง)\n- ด้ายสายสิญจน์\n- ดอกไม้ ธูป เทียน\n- ภัตตาหาร/ปิ่นโต\n- น้ำดื่ม\n- พัดลม/แอร์ (ถ้าจัดนอกสถานที่)',
-  'อวมงคล': '- สังฆทาน\n- ดอกไม้ ธูป เทียน\n- ภัตตาหาร/ปิ่นโต\n- น้ำดื่ม\n- ผ้าบังสุกุล',
+const SUGGESTED_ITEMS: Partial<Record<CeremonyType, string>> = {
+  'มงคล': '- น้ำมนต์ (ขัน/ถัง)\n- ด้ายสายสิญจน์\n- ดอกไม้ ธูป เทียน\n- ภัตตาหาร\n- น้ำดื่ม\n- พัดลม/แอร์ (ถ้าจัดนอกสถานที่)',
+  'อวมงคล': '- สังฆทาน\n- ดอกไม้ ธูป เทียน\n- ภัตตาหาร\n- น้ำดื่ม\n- ผ้าบังสุกุล',
+  'ใส่บาตรและเจริญพระพุทธมนต์': '- ข้าวสาร อาหารแห้ง\n- ดอกไม้ ธูป เทียน\n- น้ำดื่ม',
 };
 
-const SUGGESTED_TIME: Record<CeremonyType, string> = {
+const SUGGESTED_TIME: Partial<Record<CeremonyType, string>> = {
   'มงคล': 'แนะนำเวลา: เช้า 09:00 น. หรือ สาย 10:30 น.\nควรเผื่อเวลาเดินทาง 30-60 นาที\nพิธีใช้เวลาประมาณ 30-45 นาที',
   'อวมงคล': 'แนะนำเวลา: เช้า 07:00 น. หรือ บ่าย 14:00 น.\nควรเผื่อเวลาเดินทาง 30-60 นาที\nพิธีใช้เวลาประมาณ 45-60 นาที',
+  'ใส่บาตรและเจริญพระพุทธมนต์': 'แนะนำเวลา: เช้า 06:30-07:30 น.',
 };
 
 export default function LayPersonPage() {
@@ -107,8 +109,8 @@ export default function LayPersonPage() {
       templePreparationDetails: needTemplePreparation ? templePreparationDetails.trim() : undefined,
       status: 'waiting',
       createdAt: new Date().toISOString(),
-      suggestedItems: SUGGESTED_ITEMS[ceremonyType],
-      suggestedTime: SUGGESTED_TIME[ceremonyType],
+      suggestedItems: SUGGESTED_ITEMS[ceremonyType] || '',
+      suggestedTime: SUGGESTED_TIME[ceremonyType] || '',
     };
 
     // Simulate API delay
@@ -224,6 +226,7 @@ export default function LayPersonPage() {
                   <SelectContent>
                     <SelectItem value="มงคล">🟢 งานมงคล</SelectItem>
                     <SelectItem value="อวมงคล">🔴 งานอวมงคล</SelectItem>
+                    <SelectItem value="ใส่บาตรและเจริญพระพุทธมนต์">🟡 ใส่บาตรและเจริญพระพุทธมนต์</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -376,12 +379,8 @@ export default function LayPersonPage() {
                   <Label htmlFor="meal-none" className="cursor-pointer font-normal">ไม่มี</Label>
                 </div>
                 <div className="flex items-center gap-2">
-                  <RadioGroupItem value="มื้อเช้า" id="meal-morning" />
-                  <Label htmlFor="meal-morning" className="cursor-pointer font-normal">🍳 มื้อเช้า</Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="มื้อเพล" id="meal-noon" />
-                  <Label htmlFor="meal-noon" className="cursor-pointer font-normal">🍱 มื้อเพล</Label>
+                  <RadioGroupItem value="ภัตตาหาร" id="meal-food" />
+                  <Label htmlFor="meal-food" className="cursor-pointer font-normal">🍱 ภัตตาหาร</Label>
                 </div>
               </RadioGroup>
             </div>
@@ -429,7 +428,7 @@ export default function LayPersonPage() {
         <Card className="bg-muted/50 border-gold-subtle">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2 text-accent">
-              📋 แนะนำเรื่องเวลาและสิ่งที่ต้องเตรียม ({ceremonyType === 'มงคล' ? 'งานมงคล' : 'งานอวมงคล'})
+              📋 คำแนะนำและสิ่งที่ต้องเตรียม ({ceremonyType})
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">

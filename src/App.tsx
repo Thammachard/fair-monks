@@ -5,7 +5,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import HomePage from "./pages/HomePage";
 import AdminPage from "./pages/AdminPage";
-import BuildingHeadPage from "./pages/BuildingHeadPage";
 import QueuePage from "./pages/QueuePage";
 import HistoryPage from "./pages/HistoryPage";
 import LayPersonPage from "./pages/LayPersonPage";
@@ -23,7 +22,6 @@ const App = () => (
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/admin" element={<AdminPage />} />
-          <Route path="/building-head" element={<BuildingHeadPage />} />
           <Route path="/queue" element={<QueuePage />} />
           <Route path="/history" element={<HistoryPage />} />
           <Route path="/request" element={<LayPersonPage />} />

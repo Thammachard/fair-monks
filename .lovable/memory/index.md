@@ -1,29 +1,34 @@
 ระบบบริหารจัดการกิจนิมนต์พระ - project design rules, architecture, and feature decisions
 
 ## Design
-- **Colors:** Gold (#B8860B), maroon, cream — Thai temple aesthetic
+- **Colors:** Brick orange (#B85C2D / HSL 16 65% 45%), cream, white — Thai temple aesthetic
 - **Font:** Noto Sans Thai
 - **Data:** localStorage (v1), planned for Google Sheets + Cloudflare Workers
 
 ## Queue Logic
-- Smart rotation, not random. Fairness-based with cross-rank substitution
+- Smart rotation using **activityScore** (highest first), NOT queueScore
 - **4 Ranks:** มหาเถระ(19), เถระ(7), มัชฌิมะ(2), นวกะ(4)
-- **Approve rules:** approve→end of queue, sick→freeze at head, skip→penalty to end
-- **Activity score:** 1-5 from กิจ (ทำวัตร, ทำงาน, เรียน)
+- Specified monks always included first in draft
+- Auto-substitute on rejection (highest activityScore next available)
+
+## Roles (v2)
+- **NO Building Head** — removed entirely
+- **User (พระ/สามเณร):** self-service accept/reject via dashboard
+- **Admin:** create ceremonies, generate queue, view history
+- Monk availability: toggle พร้อม/ไม่พร้อม (requires reason)
+- Accept mode: รับงานทั่วไป / รับเฉพาะงานเจาะจง
 
 ## Pages
-- `/` (HomePage) — public calendar, ceremony details, contact info
-- `/admin` — Admin create ceremonies, approve requests from โยม
-- `/request` — LayPerson form to submit nimmon requests
-- `/monk` — Monk/novice chant selection + lead chanter criteria
-- `/building-head` — Building head approve/reject with dropdown reasons + sermon topic
+- `/` (HomePage) — public calendar, monk dashboard (if monk), contact
+- `/admin` — create ceremonies, queue by activityScore, communal check-in, history
+- `/request` — LayPerson form
+- `/monk` — Chant selection + lead chanter criteria
 - `/queue` — Queue monitoring
 - `/history` — Past ceremonies
 
-## Chanting System
-- 3 categories: ให้พร, มงคล, อวมงคล (defined in src/lib/chantingData.ts)
-- Lead chanter criteria: ให้ศีล5, ให้ศีล8, บรรยายธรรม, จบนักธรรมเอก
-- Monks select which chants they can do via checkboxes
+## Ceremony Types
+- มงคล, อวมงคล, ใส่บาตรและเจริญพระพุทธมนต์, งานส่วนรวมของวัด
 
-## Rejection Reasons (dropdown)
-- อาพาธ, ติดสอบบาลี, ติดสอบนักธรรม, ติดธุระส่วนตัว, เดินทางไม่ได้, สละสิทธิ์, อื่นๆ
+## Removals
+- Building Head page and role (removed in v2)
+- MealOption simplified to ไม่มี/ภัตตาหาร (no ปิ่นโต)

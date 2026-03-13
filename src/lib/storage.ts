@@ -8,13 +8,26 @@ const MONK_CHANTS_KEY = 'nimmon_monk_chants';
 
 export function loadMonks(): Monk[] {
   const stored = localStorage.getItem(MONKS_KEY);
-  if (stored) return JSON.parse(stored);
+  if (stored) {
+    // Migrate old data that may lack new fields
+    const monks = JSON.parse(stored) as Monk[];
+    return monks.map(m => ({
+      ...m,
+      activityScore: m.activityScore ?? 0,
+      availability: m.availability ?? 'พร้อมรับงาน',
+      acceptMode: m.acceptMode ?? 'รับงานทั่วไป',
+    }));
+  }
   localStorage.setItem(MONKS_KEY, JSON.stringify(MOCK_MONKS));
   return [...MOCK_MONKS];
 }
 
 export function saveMonks(monks: Monk[]) {
   localStorage.setItem(MONKS_KEY, JSON.stringify(monks));
+}
+
+export function resetMonks() {
+  localStorage.removeItem(MONKS_KEY);
 }
 
 export function loadCeremonies(): Ceremony[] {
