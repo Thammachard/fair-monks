@@ -8,8 +8,6 @@ import { Calendar } from '@/components/ui/calendar';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
-import { Separator } from '@/components/ui/separator';
-import { Progress } from '@/components/ui/progress';
 import { useNavigate } from 'react-router-dom';
 import {
   CalendarIcon, MapPin, Phone, Users, Clock, ChevronRight, Info, Settings,
