@@ -38,8 +38,6 @@ export default function HomePage() {
   const [ceremonies, setCeremonies] = useState<Ceremony[]>([]);
   const [monks, setMonks] = useState<Monk[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [selectedMonkId, setSelectedMonkId] = useState<string>('');
-  const [showDashboard, setShowDashboard] = useState(false);
 
   const laypeopleRef = useRef<HTMLElement>(null);
   const monkRef = useRef<HTMLElement>(null);
