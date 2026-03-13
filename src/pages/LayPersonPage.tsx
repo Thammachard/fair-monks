@@ -226,6 +226,7 @@ export default function LayPersonPage() {
                   <SelectContent>
                     <SelectItem value="มงคล">🟢 งานมงคล</SelectItem>
                     <SelectItem value="อวมงคล">🔴 งานอวมงคล</SelectItem>
+                    <SelectItem value="ใส่บาตรและเจริญพระพุทธมนต์">🟡 ใส่บาตรและเจริญพระพุทธมนต์</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
