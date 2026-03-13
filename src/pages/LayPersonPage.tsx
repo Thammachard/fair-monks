@@ -109,8 +109,8 @@ export default function LayPersonPage() {
       templePreparationDetails: needTemplePreparation ? templePreparationDetails.trim() : undefined,
       status: 'waiting',
       createdAt: new Date().toISOString(),
-      suggestedItems: SUGGESTED_ITEMS[ceremonyType],
-      suggestedTime: SUGGESTED_TIME[ceremonyType],
+      suggestedItems: SUGGESTED_ITEMS[ceremonyType] || '',
+      suggestedTime: SUGGESTED_TIME[ceremonyType] || '',
     };
 
     // Simulate API delay
