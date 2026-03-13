@@ -10,6 +10,14 @@ export type AssignmentStatus = 'draft' | 'pending' | 'approved' | 'rejected_sick
 
 export type CeremonyLocation = 'ในวัด' | 'นอกวัด';
 
+export interface AssignmentHistoryEntry {
+  ceremonyId: string;
+  ceremonyName: string;
+  date: string;
+  status: 'attended' | 'rejected' | 'substituted';
+  role?: 'หัวนำสวด' | 'ผู้สวด';
+}
+
 export interface Monk {
   id: string;
   name: string;
@@ -24,6 +32,7 @@ export interface Monk {
   chantIds?: string[];              // บทสวดที่สวดได้
   activityScore?: number;           // คะแนนกิจ 1-5
   leadCriteria?: LeadChanterCriteria; // เกณฑ์หัวนำสวด
+  assignmentHistory?: AssignmentHistoryEntry[]; // ประวัติการรับงาน
 }
 
 export interface QuotaConfig {
