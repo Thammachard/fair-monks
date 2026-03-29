@@ -97,7 +97,7 @@ export default function AdminPage() {
         return b.monk.yearsOrdained - a.monk.yearsOrdained;
       });
       setDraftAssignments(sorted);
-      toast.success('🤖 จัดรายชื่อตามคะแนนจิตพิสัยสำเร็จ!');
+      toast.success('🤖 จัดรายชื่อตามคิวสำเร็จ!');
     } catch (e: any) {
       toast.error(e.message);
     }
@@ -684,7 +684,7 @@ export default function AdminPage() {
 
                 <Button variant="gold" className="w-full gap-2" size="lg" onClick={handleGenerate}>
                   <Sparkles className="h-5 w-5" />
-                  🤖 จัดรายชื่อตามคะแนนจิตพิสัย
+                  🤖 จัดรายชื่อตามคิว
                 </Button>
               </>
             )}
