@@ -26,8 +26,8 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 const CONTACT_INFO = {
-  name: 'พระมหาสมชาย (เจ้าหน้าที่กิจนิมนต์)',
-  phone: '081-234-5678',
+  name: 'พระครูสถิตญาณธรรม',
+  phone: '083-481-8456',
   line: '@temple-nimmon',
   address: 'วัดหลวงพ่อสดธรรมกายาราม ต.หน้าเมือง อ.เมือง จ.ราชบุรี 70000',
 };
@@ -390,6 +390,13 @@ export default function HomePage() {
                     <div className="min-w-0">
                       <p className="font-medium truncate">{h.ceremonyName}</p>
                       <p className="text-muted-foreground">{h.date} {h.role ? `· ${h.role}` : ''}</p>
+                      {/* Show ceremony title in history (unlocked) */}
+                      {(() => {
+                        const c = ceremonies.find(ce => ce.id === h.ceremonyId);
+                        return c?.ceremonyTitle ? (
+                          <p className="text-muted-foreground truncate">📌 {c.ceremonyTitle}</p>
+                        ) : null;
+                      })()}
                       {h.rejectReason && <p className="text-destructive">เหตุผล: {h.rejectReason}</p>}
                     </div>
                     <Badge variant={h.status === 'attended' ? 'success' : 'destructive'} className="text-[10px] shrink-0">
@@ -516,101 +523,124 @@ export default function HomePage() {
         <section>
           <div className="flex items-center gap-2 mb-1">
             <Star className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-bold text-foreground">ตรวจสอบตารางกิจกรรมวัด</h2>
+            <h2 className="text-lg font-bold text-foreground">ปฏิทินงานบุญประจำวัด</h2>
           </div>
           <p className="text-sm text-muted-foreground mb-4">
-            กรุณาตรวจสอบตารางงานส่วนกลางของวัดก่อนทำการขอนิมนต์
+            กรุณาตรวจสอบตารางงานก่อนทำการขอนิมนต์ — วันที่มีขีดเส้นใต้คือวันที่มีงาน
           </p>
 
-          <Card className="shadow-card border-gold-subtle">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <CalendarIcon className="h-5 w-5 text-primary" />
-                ปฏิทินงานบุญ — {format(selectedDate, 'MMMM yyyy', { locale: th })}
-              </CardTitle>
-              <div className="flex flex-wrap gap-3 text-xs mt-2">
-                <span className="flex items-center gap-1">🟢 มงคลนอกวัด</span>
-                <span className="flex items-center gap-1">🟡 งานในวัด</span>
-                <span className="flex items-center gap-1">⬜ อวมงคล</span>
-                <span className="flex items-center gap-1">🔴 วันพระ/วันสำคัญ</span>
-              </div>
-            </CardHeader>
-            <CardContent className="px-0 sm:px-6">
-              <div className="w-full [&_.rdp]:w-full [&_.rdp-months]:w-full [&_.rdp-month]:w-full [&_.rdp-table]:w-full [&_.rdp-head_cell]:text-sm [&_.rdp-head_cell]:w-auto [&_.rdp-head_cell]:flex-1 [&_.rdp-cell]:w-auto [&_.rdp-cell]:flex-1 [&_.rdp-cell]:h-12 [&_.rdp-day]:w-full [&_.rdp-day]:h-12 [&_.rdp-day]:text-base [&_.rdp-head_row]:flex [&_.rdp-row]:flex [&_.rdp-caption]:text-lg">
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={(d) => d && setSelectedDate(d)}
-                  defaultMonth={new Date(2026, 2)}
-                  className="p-3 pointer-events-auto w-full"
-                  modifiers={{ ceremony: ceremonyDates }}
-                  modifiersStyles={{
-                    ceremony: {
-                      fontWeight: 'bold',
-                      textDecoration: 'underline',
-                      textDecorationColor: 'hsl(16, 65%, 45%)',
-                    },
-                  }}
-                />
-              </div>
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+            {/* Calendar */}
+            <Card className="shadow-card border-gold-subtle lg:col-span-3">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <CalendarIcon className="h-5 w-5 text-primary" />
+                  {format(selectedDate, 'MMMM yyyy', { locale: th })}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-1 sm:px-4">
+                <div className="w-full [&_.rdp]:w-full [&_.rdp-months]:w-full [&_.rdp-month]:w-full [&_.rdp-table]:w-full [&_.rdp-head_cell]:text-sm [&_.rdp-head_cell]:w-auto [&_.rdp-head_cell]:flex-1 [&_.rdp-cell]:w-auto [&_.rdp-cell]:flex-1 [&_.rdp-cell]:h-12 [&_.rdp-day]:w-full [&_.rdp-day]:h-12 [&_.rdp-day]:text-base [&_.rdp-head_row]:flex [&_.rdp-row]:flex [&_.rdp-caption]:text-lg">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={(d) => d && setSelectedDate(d)}
+                    defaultMonth={new Date(2026, 2)}
+                    className="p-3 pointer-events-auto w-full"
+                    modifiers={{ ceremony: ceremonyDates }}
+                    modifiersStyles={{
+                      ceremony: {
+                        fontWeight: 'bold',
+                        textDecoration: 'underline',
+                        textDecorationColor: 'hsl(16, 65%, 45%)',
+                      },
+                    }}
+                  />
+                </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs mt-3 px-2">
+                  <span className="flex items-center gap-1">🟢 มงคลนอกวัด</span>
+                  <span className="flex items-center gap-1">🟡 งานในวัด</span>
+                  <span className="flex items-center gap-1">⬜ อวมงคล</span>
+                  <span className="flex items-center gap-1">🔴 วันสำคัญ</span>
+                </div>
+              </CardContent>
+            </Card>
 
-              <div className="mt-6 px-4 sm:px-0 space-y-3">
-                <p className="text-base font-bold">
+            {/* Selected Date Details */}
+            <Card className="shadow-card lg:col-span-2">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">
                   📅 {format(selectedDate, 'PPPPp', { locale: th }).split(' เวลา')[0]}
-                </p>
-
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
                 {SPECIAL_DATES.filter(s => {
                   try { return isSameDay(parseISO(s.date), selectedDate); } catch { return false; }
                 }).map((s, i) => (
-                  <div key={i} className="rounded-lg p-4 bg-destructive/10 border border-destructive/20">
-                    <p className="text-base font-semibold text-destructive">🔴 {s.label}</p>
+                  <div key={i} className="rounded-lg p-3 bg-destructive/10 border border-destructive/20">
+                    <p className="text-sm font-semibold text-destructive">🔴 {s.label}</p>
                   </div>
                 ))}
 
                 {ceremoniesOnDate.length === 0 && (
-                  <p className="text-sm text-muted-foreground">ไม่มีงานนิมนต์ในวันนี้</p>
+                  <div className="text-center py-6">
+                    <CalendarIcon className="h-10 w-10 text-muted-foreground/30 mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground">ไม่มีงานนิมนต์ในวันนี้</p>
+                  </div>
                 )}
 
                 {ceremoniesOnDate.map(c => {
                   const style = getTypeStyle(c.type, c.ceremonyLocation);
                   return (
-                    <div key={c.id} className={`rounded-lg p-4 ${style.bg} border`}>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className={`font-semibold text-base ${style.text}`}>
+                    <div key={c.id} className={`rounded-lg p-3 ${style.bg} border`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className={`font-semibold text-sm ${style.text}`}>
                             {style.dot} {c.type} — {c.monkCount} รูป
-                            {c.ceremonyLocation && ` (${c.ceremonyLocation})`}
                           </p>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {c.time || '-'} · {c.requesterName}
+                          <p className="text-xs text-muted-foreground mt-1">
+                            🕐 {c.time || '-'} · {c.requesterName}
                           </p>
                           {c.location && (
-                            <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                              <MapPin className="h-4 w-4" /> {c.location}
+                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                              <MapPin className="h-3 w-3" /> {c.location}
                             </p>
                           )}
+                          {c.ceremonyLocation && (
+                            <Badge variant="outline" className="text-[10px] mt-1">{c.ceremonyLocation}</Badge>
+                          )}
                         </div>
-                        <Badge variant={c.status === 'confirmed' ? 'success' : 'warning'}>
+                        <Badge variant={c.status === 'confirmed' ? 'success' : 'warning'} className="shrink-0 text-[10px]">
                           {c.status === 'confirmed' ? 'ยืนยัน' : 'รอ'}
                         </Badge>
                       </div>
                     </div>
                   );
                 })}
-              </div>
 
-              {specialDatesThisMonth.length > 0 && (
-                <div className="mt-6 pt-4 border-t mx-4 sm:mx-0">
-                  <p className="text-sm font-semibold mb-2">📌 วันสำคัญในเดือนนี้:</p>
-                  <div className="space-y-1.5">
-                    {specialDatesThisMonth.map((s, i) => (
-                      <p key={i} className="text-sm text-muted-foreground">
-                        • {(() => { try { return format(parseISO(s.date), 'd MMM', { locale: th }); } catch { return s.date; } })()} — {s.label}
-                      </p>
-                    ))}
+                {specialDatesThisMonth.length > 0 && (
+                  <div className="pt-3 border-t">
+                    <p className="text-xs font-semibold mb-1.5">📌 วันสำคัญในเดือนนี้</p>
+                    <div className="space-y-1">
+                      {specialDatesThisMonth.map((s, i) => (
+                        <p key={i} className="text-xs text-muted-foreground">
+                          • {(() => { try { return format(parseISO(s.date), 'd MMM', { locale: th }); } catch { return s.date; } })()} — {s.label}
+                        </p>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Contact info card */}
+          <Card className="mt-4 shadow-card bg-primary/5 border-primary/20">
+            <CardContent className="py-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm">
+              <span className="font-semibold">ติดต่อสอบถาม:</span>
+              <span>{CONTACT_INFO.name}</span>
+              <a href={`tel:${CONTACT_INFO.phone.replace(/-/g, '')}`} className="text-primary font-semibold flex items-center gap-1">
+                <Phone className="h-3.5 w-3.5" /> {CONTACT_INFO.phone}
+              </a>
             </CardContent>
           </Card>
         </section>
